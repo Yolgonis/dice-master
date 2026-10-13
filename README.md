@@ -11,7 +11,7 @@ Dice Master, Foundry Virtual Tabletop V13 için GM kontrollü zar etkisi modül�
 - Zar türüne göre pozitif yön ve etki ayarları
 - Better/Worse bias taban ve tavan sınırları
 - D&D5e ve Midi-QOL zar akışlarında kullanıcı ayrımı
-- İsteğe bağlı Socketlib ve Dice So Nice entegrasyonu
+- İsteğe bağlı Socketlib, Dice So Nice ve libWrapper entegrasyonu
 - GM için sürüklenebilir hızlı kontrol paneli
 - İsteğe bağlı açık bildirim ve GM debug mesajları
 
@@ -38,6 +38,7 @@ Dice Master, Foundry Virtual Tabletop V13 için GM kontrollü zar etkisi modül�
 - D&D5e roll akışları
 - Opsiyonel: Socketlib
 - Opsiyonel: Dice So Nice
+- Opsiyonel (önerilir): libWrapper. Etkinse zar yamaları libWrapper `WRAPPER` zinciriyle kaydedilir ve Midi-QOL gibi aynı zar metotlarını saran modüllerle uyumlu çalışır; yoksa doğrudan yamaya geri düşülür.
 - Midi-QOL etkinlik bağlamları için entegrasyon hook’ları
 
 ## Geliştirme

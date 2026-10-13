@@ -2,7 +2,7 @@
   "id": "dice-master",
   "title": "Dice Master",
   "description": "GM-controlled per-user dice influence with isolated roll workflows, configurable strategies, and Better/Worse bias limits.",
-  "version": "0.7.0",
+  "version": "0.7.1",
   "readme": "README.md",
   "changelog": "CHANGELOG.md",
   "socket": true,
@@ -13,7 +13,7 @@
   ],
   "compatibility": {
     "minimum": "13",
-    "verified": "13"
+    "verified": "13.351"
   },
   "esmodules": [
     "dice-master.js"
@@ -46,6 +46,10 @@
       },
       {
         "id": "dice-so-nice",
+        "type": "module"
+      },
+      {
+        "id": "lib-wrapper",
         "type": "module"
       }
     ],

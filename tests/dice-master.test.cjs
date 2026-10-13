@@ -6,7 +6,7 @@ const vm = require("node:vm");
 
 const moduleSource = fs.readFileSync(path.join(__dirname, "..", "dice-master.js"), "utf8");
 
-function createHarness({ random = [0.8, 0.05] } = {}) {
+function createHarness({ random = [0.8, 0.05], withLibWrapper = false } = {}) {
   const hookEvents = new Map();
   const onceEvents = new Map();
   const Hooks = {
@@ -186,11 +186,27 @@ function createHarness({ random = [0.8, 0.05] } = {}) {
     }
   });
   context.globalThis = context;
+  const libWrapperRegistrations = [];
+  if ( withLibWrapper ) {
+    context.libWrapper = {
+      register(moduleId, target, fn, type) {
+        libWrapperRegistrations.push({ moduleId, target, type });
+        const parts = target.split(".");
+        const method = parts.pop();
+        const owner = parts.reduce((object, key) => object[key], context);
+        const original = owner[method];
+        owner[method] = function(...args) {
+          return fn.call(this, (...wrappedArgs) => original.apply(this, wrappedArgs), ...args);
+        };
+      }
+    };
+  }
   vm.runInContext(moduleSource, context, { filename: "dice-master.js" });
   Hooks.callAll("init");
 
   return {
     Hooks,
+    libWrapperRegistrations,
     MockBasicRoll,
     MockDie,
     MockRoll,
@@ -290,6 +306,29 @@ test("installing the roll patches twice does not influence one die twice", async
 
   assert.equal(die.results[0].result, 14);
   assert.equal(die._fumbleSwitchDebug.length, 1);
+});
+
+test("with libWrapper active every roll patch is registered once as a WRAPPER and still influences dice", async () => {
+  const harness = createHarness({ withLibWrapper: true });
+  await harness.context.game.settings.set("dice-master", "cheatStrategy", "nudge");
+  await harness.context.game.settings.set("dice-master", "nudgeValues", { d20: 4 });
+  harness.context.game.user = harness.gm;
+
+  harness.context.patchRollEvaluate();
+  harness.context.patchDnd5eBuildEvaluate();
+
+  const targets = harness.libWrapperRegistrations.map(entry => entry.target).sort();
+  assert.deepEqual(targets, [
+    "CONFIG.Dice.BasicRoll.buildEvaluate",
+    "Roll.prototype.evaluate",
+    "foundry.dice.terms.Die.prototype._evaluateModifiers",
+    "foundry.dice.terms.Die.prototype.roll"
+  ]);
+  assert.ok(harness.libWrapperRegistrations.every(entry => entry.moduleId === "dice-master" && entry.type === "WRAPPER"));
+
+  const die = new harness.MockDie({ faces: 20, originals: [10] });
+  await new harness.MockRoll([die]).evaluate();
+  assert.equal(die.results[0].result, 14);
 });
 
 test("all four influence strategies preserve die boundaries and semantic direction", () => {

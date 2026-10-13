@@ -1,6 +1,6 @@
 //#region src/constants.ts
 var MODULE_ID = "dice-master";
-var MODULE_VERSION = "0.7.0";
+var MODULE_VERSION = "0.7.1";
 var SOCKET_NAME = `module.${MODULE_ID}`;
 var socketlibModule = null;
 var DIE_TYPES = [
@@ -687,21 +687,18 @@ function registerRollControllerHooks() {
 function patchDnd5eBuildEvaluate() {
 	const rollClass = CONFIG.Dice?.BasicRoll;
 	const originalBuildEvaluate = rollClass?.buildEvaluate;
-	if (typeof originalBuildEvaluate !== "function" || originalBuildEvaluate._diceMasterPatched || originalBuildEvaluate._fumbleSwitchCustomPatched) return;
-	async function patchedBuildEvaluate(rolls, config = {}, message = {}) {
+	if (typeof originalBuildEvaluate !== "function" || originalBuildEvaluate._fumbleSwitchCustomPatched) return;
+	installWrapper(rollClass, "CONFIG.Dice.BasicRoll", "buildEvaluate", async function patchedBuildEvaluate(wrapped, rolls, config = {}, message = {}) {
 		const actor = resolveActorFromRollContext(config, message);
 		const workflow = getWorkflowFromContext(config);
 		const controllerUserId = resolveRollControllerUserId(actor, config, message);
-		if (!controllerUserId) return originalBuildEvaluate.call(this, rolls, config, message);
+		if (!controllerUserId) return wrapped(rolls, config, message);
 		const source = `dnd5e-buildEvaluate:${workflow?.id ?? message?.id ?? actor?.id ?? "roll"}`;
 		lastRollControllerTrace = `${source}->${controllerUserId}`;
 		rememberWorkflowController(workflow, message, controllerUserId, source);
 		for (const roll of rolls ?? []) bindRollController(roll, controllerUserId, source);
-		return await originalBuildEvaluate.call(this, rolls, config, message);
-	}
-	patchedBuildEvaluate._diceMasterPatched = true;
-	patchedBuildEvaluate._fumbleSwitchCustomPatched = true;
-	rollClass.buildEvaluate = patchedBuildEvaluate;
+		return await wrapped(rolls, config, message);
+	});
 }
 function getControllerLabel(controllerUserId) {
 	if (!controllerUserId) return game.user?.isGM ? "GM" : game.user?.name ?? "Player";
@@ -890,99 +887,107 @@ function consumePendingDebugInfo() {
 	pendingDebugInfo = [];
 	return info;
 }
+var installedWrappers = new Set();
+/**
+ * Wrap a method with libWrapper when it is active, so Dice Master chains with Midi-QOL
+ * and other roll modules; otherwise patch the method directly. Each target is installed once.
+ */
+function installWrapper(owner, targetPath, method, wrapper) {
+	const target = `${targetPath}.${method}`;
+	if (installedWrappers.has(target)) return;
+	if (globalThis.libWrapper?.register) {
+		globalThis.libWrapper.register(MODULE_ID, target, wrapper, "WRAPPER");
+		installedWrappers.add(target);
+		return;
+	}
+	const original = owner?.[method];
+	if (typeof original !== "function" || original._diceMasterPatched) return;
+	const patched = function(...args) {
+		return wrapper.call(this, (...wrappedArgs) => original.apply(this, wrappedArgs), ...args);
+	};
+	Object.defineProperty(patched, "_diceMasterPatched", { value: true });
+	owner[method] = patched;
+	installedWrappers.add(target);
+}
 function patchRollEvaluate() {
-	const dieProto = foundry.dice.terms.Die.prototype;
-	const originalRoll = dieProto.roll;
-	if (!originalRoll?._diceMasterPatched) {
-		dieProto.roll = async function patchedRoll(options) {
-			const result = await originalRoll.call(this, options);
-			const controllerUserId = dieControllerUserIds.get(this) ?? getLocalControllerUserId();
-			const config = getCheatConfig(controllerUserId);
-			const { faces } = this;
-			if (!faces) return result;
-			const dieType = getDieType(faces);
-			if (!dieType || !isDieAffected(dieType)) return result;
-			const originalResult = result.result;
-			if (config.state === "off") return result;
-			const positiveDirection = getPositiveDirection(dieType);
-			const direction = resolveDirection(config.state, positiveDirection);
-			if (!direction) return result;
-			const context = {
-				state: config.state,
-				direction,
+	installWrapper(foundry.dice.terms.Die.prototype, "foundry.dice.terms.Die.prototype", "roll", async function patchedRoll(wrapped, options) {
+		const result = await wrapped(options);
+		const controllerUserId = dieControllerUserIds.get(this) ?? getLocalControllerUserId();
+		const config = getCheatConfig(controllerUserId);
+		const { faces } = this;
+		if (!faces) return result;
+		const dieType = getDieType(faces);
+		if (!dieType || !isDieAffected(dieType)) return result;
+		const originalResult = result.result;
+		if (config.state === "off") return result;
+		const positiveDirection = getPositiveDirection(dieType);
+		const direction = resolveDirection(config.state, positiveDirection);
+		if (!direction) return result;
+		const context = {
+			state: config.state,
+			direction,
+			faces,
+			nudgeValue: getNudgeValue(dieType),
+			biasBetterLimit: getBiasLimit(dieType, "better"),
+			biasWorseLimit: getBiasLimit(dieType, "worse"),
+			thresholdPercent: config.thresholdPercent
+		};
+		const debug = applyStrategy(config.strategy, [result], context);
+		this._diceMasterInfluenced = true;
+		this._diceMasterDirection = config.state;
+		this._fumbleSwitchCheated = true;
+		this._fumbleSwitchDirection = config.state;
+		if (config.debugMode) {
+			const info = {
+				dieType,
 				faces,
-				nudgeValue: getNudgeValue(dieType),
-				biasBetterLimit: getBiasLimit(dieType, "better"),
-				biasWorseLimit: getBiasLimit(dieType, "worse"),
-				thresholdPercent: config.thresholdPercent
+				strategy: config.strategy,
+				state: config.state,
+				controller: getControllerLabel(controllerUserId),
+				controllerTrace: dieControllerTraces.get(this) ?? `local-die->${controllerUserId ?? "unknown"}`,
+				direction,
+				originalResult,
+				finalResult: result.result,
+				...debug
 			};
-			const debug = applyStrategy(config.strategy, [result], context);
-			this._diceMasterInfluenced = true;
-			this._diceMasterDirection = config.state;
-			this._fumbleSwitchCheated = true;
-			this._fumbleSwitchDirection = config.state;
-			if (config.debugMode) {
-				const info = {
-					dieType,
-					faces,
-					strategy: config.strategy,
-					state: config.state,
-					controller: getControllerLabel(controllerUserId),
-					controllerTrace: dieControllerTraces.get(this) ?? `local-die->${controllerUserId ?? "unknown"}`,
-					direction,
-					originalResult,
-					finalResult: result.result,
-					...debug
-				};
-				if (!this._diceMasterDebug) this._diceMasterDebug = [];
-				this._diceMasterDebug.push(info);
-				this._fumbleSwitchDebug = this._diceMasterDebug;
+			if (!this._diceMasterDebug) this._diceMasterDebug = [];
+			this._diceMasterDebug.push(info);
+			this._fumbleSwitchDebug = this._diceMasterDebug;
+		}
+		return result;
+	});
+	installWrapper(foundry.dice.terms.Die.prototype, "foundry.dice.terms.Die.prototype", "_evaluateModifiers", async function patchedEvaluateModifiers(wrapped, ...args) {
+		let advantageModifier = applyPendingAdvantageSelection(this);
+		const evaluated = await wrapped(...args);
+		advantageModifier ??= repairPendingAdvantageSelection(this);
+		if (advantageModifier) this.modifiers.unshift(advantageModifier);
+		return evaluated;
+	});
+	installWrapper(Roll.prototype, "Roll.prototype", "evaluate", async function patchedEvaluate(wrapped, options) {
+		const controllerUserId = rollControllerUserIds.get(this) ?? getLocalControllerUserId();
+		const source = rollControllerTraces.get(this) ?? `local-roll:${this.id ?? this._id ?? "anonymous"}`;
+		if (controllerUserId) bindRollController(this, controllerUserId, source);
+		const result = await wrapped(options);
+		const config = getCheatConfig(controllerUserId);
+		if (!config.explicitMode && !config.debugMode) return result;
+		if (!result.terms.some((term) => term._diceMasterInfluenced || term._fumbleSwitchCheated)) return result;
+		if (config.explicitMode) {
+			result.options.diceMasterInfluenced = true;
+			result.options.diceMasterDirection = config.state;
+			result.options.fumbleSwitchCheated = true;
+			result.options.fumbleSwitchDirection = config.state;
+			pendingCheatedRoll = true;
+		}
+		if (config.debugMode) {
+			const debugInfo = result.terms.flatMap((term) => term._diceMasterDebug ?? term._fumbleSwitchDebug ?? []);
+			if (debugInfo.length > 0) {
+				result.options.diceMasterDebug = debugInfo;
+				result.options.fumbleSwitchDebug = debugInfo;
+				pendingDebugInfo.push(...debugInfo);
 			}
-			return result;
-		};
-		Object.defineProperty(dieProto.roll, "_diceMasterPatched", { value: true });
-	}
-	const originalEvaluateModifiers = dieProto._evaluateModifiers;
-	if (!originalEvaluateModifiers?._diceMasterPatched) {
-		dieProto._evaluateModifiers = async function patchedEvaluateModifiers(...args) {
-			let advantageModifier = applyPendingAdvantageSelection(this);
-			const evaluated = await originalEvaluateModifiers.apply(this, args);
-			advantageModifier ??= repairPendingAdvantageSelection(this);
-			if (advantageModifier) this.modifiers.unshift(advantageModifier);
-			return evaluated;
-		};
-		Object.defineProperty(dieProto._evaluateModifiers, "_diceMasterPatched", { value: true });
-	}
-	const rollProto = Roll.prototype;
-	const originalEvaluate = rollProto.evaluate;
-	if (!originalEvaluate?._diceMasterPatched) {
-		rollProto.evaluate = async function patchedEvaluate(options) {
-			const controllerUserId = rollControllerUserIds.get(this) ?? getLocalControllerUserId();
-			const source = rollControllerTraces.get(this) ?? `local-roll:${this.id ?? this._id ?? "anonymous"}`;
-			if (controllerUserId) bindRollController(this, controllerUserId, source);
-			const result = await originalEvaluate.call(this, options);
-			const config = getCheatConfig(controllerUserId);
-			if (!config.explicitMode && !config.debugMode) return result;
-			if (!result.terms.some((term) => term._diceMasterInfluenced || term._fumbleSwitchCheated)) return result;
-			if (config.explicitMode) {
-				result.options.diceMasterInfluenced = true;
-				result.options.diceMasterDirection = config.state;
-				result.options.fumbleSwitchCheated = true;
-				result.options.fumbleSwitchDirection = config.state;
-				pendingCheatedRoll = true;
-			}
-			if (config.debugMode) {
-				const debugInfo = result.terms.flatMap((term) => term._diceMasterDebug ?? term._fumbleSwitchDebug ?? []);
-				if (debugInfo.length > 0) {
-					result.options.diceMasterDebug = debugInfo;
-					result.options.fumbleSwitchDebug = debugInfo;
-					pendingDebugInfo.push(...debugInfo);
-				}
-			}
-			return result;
-		};
-		Object.defineProperty(rollProto.evaluate, "_diceMasterPatched", { value: true });
-	}
+		}
+		return result;
+	});
 }
 //#endregion
 //#region src/ui/widget.ts

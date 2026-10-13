@@ -2,6 +2,17 @@
 
 Bu projedeki önemli değişiklikler bu dosyada belgelenir.
 
+## 0.7.1 — 2026-10-13
+
+### Compatibility
+
+- libWrapper etkinse `Die#roll`, `Die#_evaluateModifiers`, `Roll#evaluate` ve dnd5e `BasicRoll.buildEvaluate` yamaları libWrapper `WRAPPER` zinciri üzerinden kaydedilir; Midi-QOL ve aynı metotları saran diğer zar modülleriyle zincirleme korunur. libWrapper yoksa önceki doğrudan yama davranışı aynen sürer.
+- libWrapper isteğe bağlı ilişki olarak manifeste eklendi; doğrulanan Foundry sürümü 13.351.
+
+### Testing
+
+- libWrapper yolu için test eklendi: dört yamanın her biri bir kez `WRAPPER` olarak kaydedilir ve zar etkisi çalışmaya devam eder. Test sayısı 33.
+
 ## 0.7.0 — 2026-09-10
 
 ### Maintainability

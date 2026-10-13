@@ -452,21 +452,18 @@ function registerRollControllerHooks() {
 function patchDnd5eBuildEvaluate() {
 	const rollClass = CONFIG.Dice?.BasicRoll;
 	const originalBuildEvaluate = rollClass?.buildEvaluate;
-	if (typeof originalBuildEvaluate !== "function" || originalBuildEvaluate._diceMasterPatched || originalBuildEvaluate._fumbleSwitchCustomPatched) return;
-	async function patchedBuildEvaluate(rolls, config = {}, message = {}) {
+	if (typeof originalBuildEvaluate !== "function" || originalBuildEvaluate._fumbleSwitchCustomPatched) return;
+	installWrapper(rollClass, "CONFIG.Dice.BasicRoll", "buildEvaluate", async function patchedBuildEvaluate(wrapped, rolls, config = {}, message = {}) {
 		const actor = resolveActorFromRollContext(config, message);
 		const workflow = getWorkflowFromContext(config);
 		const controllerUserId = resolveRollControllerUserId(actor, config, message);
-		if (!controllerUserId) return originalBuildEvaluate.call(this, rolls, config, message);
+		if (!controllerUserId) return wrapped(rolls, config, message);
 		const source = `dnd5e-buildEvaluate:${workflow?.id ?? message?.id ?? actor?.id ?? "roll"}`;
 		lastRollControllerTrace = `${source}->${controllerUserId}`;
 		rememberWorkflowController(workflow, message, controllerUserId, source);
 		for (const roll of rolls ?? []) bindRollController(roll, controllerUserId, source);
-		return await originalBuildEvaluate.call(this, rolls, config, message);
-	}
-	patchedBuildEvaluate._diceMasterPatched = true;
-	patchedBuildEvaluate._fumbleSwitchCustomPatched = true;
-	rollClass.buildEvaluate = patchedBuildEvaluate;
+		return await wrapped(rolls, config, message);
+	});
 }
 function getControllerLabel(controllerUserId) {
 	if (!controllerUserId) return game.user?.isGM ? "GM" : game.user?.name ?? "Player";
