@@ -1,0 +1,61 @@
+{
+  "id": "dice-master",
+  "title": "Dice Master",
+  "description": "GM-controlled per-user dice influence with isolated roll workflows, configurable strategies, and Better/Worse bias limits.",
+  "version": "0.7.0",
+  "readme": "README.md",
+  "changelog": "CHANGELOG.md",
+  "socket": true,
+  "authors": [
+    {
+      "name": "Yolgonis"
+    }
+  ],
+  "compatibility": {
+    "minimum": "13",
+    "verified": "13"
+  },
+  "esmodules": [
+    "dice-master.js"
+  ],
+  "styles": [
+    "dice-master.css"
+  ],
+  "languages": [
+    {
+      "lang": "en",
+      "name": "English",
+      "path": "lang/en.json"
+    },
+    {
+      "lang": "pl",
+      "name": "Polski",
+      "path": "lang/pl.json"
+    },
+    {
+      "lang": "tr",
+      "name": "Türkçe",
+      "path": "lang/tr.json"
+    }
+  ],
+  "relationships": {
+    "optional": [
+      {
+        "id": "socketlib",
+        "type": "module"
+      },
+      {
+        "id": "dice-so-nice",
+        "type": "module"
+      }
+    ],
+    "conflicts": [
+      {
+        "id": "fumble-switch",
+        "type": "module",
+        "reason": "Dice Master is standalone and must not be enabled together with the conflicting original module."
+      }
+    ]
+  },
+  "license": "LICENSE"
+}

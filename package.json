@@ -1,0 +1,11 @@
+{
+  "name": "dice-master",
+  "version": "0.7.0",
+  "private": true,
+  "scripts": {
+    "build": "node scripts/build.cjs",
+    "test": "node --test tests/*.test.cjs",
+    "check": "node --check dice-master.js",
+    "test:coverage": "node scripts/coverage.cjs"
+  }
+}

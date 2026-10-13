@@ -1,0 +1,39 @@
+<form>
+  <p class="notes">{{localize "DICE_MASTER.settingsMenu.notes"}} <strong>{{globalDirection}}</strong></p>
+  <p class="notes">{{localize "DICE_MASTER.settingsMenu.biasLimitHint"}}</p>
+  <table>
+    <thead>
+      <tr>
+        <th rowspan="2">{{localize "DICE_MASTER.settingsMenu.die"}}</th>
+        <th rowspan="2">{{localize "DICE_MASTER.settingsMenu.enabled"}}</th>
+        <th rowspan="2">{{localize "DICE_MASTER.settingsMenu.direction"}}</th>
+        <th rowspan="2">{{localize "DICE_MASTER.settingsMenu.nudgeValue"}}</th>
+        <th colspan="2">{{localize "DICE_MASTER.settingsMenu.biasLimits"}}</th>
+      </tr>
+      <tr>
+        <th>{{localize "DICE_MASTER.settingsMenu.betterLimit"}}</th>
+        <th>{{localize "DICE_MASTER.settingsMenu.worseLimit"}}</th>
+      </tr>
+    </thead>
+    <tbody>
+      {{#each dice}}
+      <tr>
+        <td><strong>{{die}}</strong></td>
+        <td><input type="checkbox" name="affected-{{die}}" {{#if affected}}checked{{/if}} /></td>
+        <td>
+          <select name="direction-{{die}}">
+            <option value="higher" {{#if (eq direction "higher")}}selected{{/if}}>{{localize "DICE_MASTER.settingsMenu.higher"}}</option>
+            <option value="lower" {{#if (eq direction "lower")}}selected{{/if}}>{{localize "DICE_MASTER.settingsMenu.lower"}}</option>
+          </select>
+        </td>
+        <td><input type="number" name="nudge-{{die}}" value="{{nudgeValue}}" min="0" style="width: 50px;" /></td>
+        <td><input type="number" name="bias-better-{{die}}" value="{{biasBetterLimit}}" min="0" max="{{faces}}" step="1" style="width: 55px;" /></td>
+        <td><input type="number" name="bias-worse-{{die}}" value="{{biasWorseLimit}}" min="0" max="{{faces}}" step="1" style="width: 55px;" /></td>
+      </tr>
+      {{/each}}
+    </tbody>
+  </table>
+  <footer class="sheet-footer flexrow">
+    <button type="submit"><i class="fas fa-save"></i> {{localize "DICE_MASTER.settingsMenu.save"}}</button>
+  </footer>
+</form>

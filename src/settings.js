@@ -1,0 +1,129 @@
+var s$2 = () => game.settings;
+function registerSettings() {
+	s$2().register(MODULE_ID, "cheatStrategy", {
+		name: "DICE_MASTER.settings.cheatStrategy.name",
+		hint: "DICE_MASTER.settings.cheatStrategy.hint",
+		scope: "world",
+		config: true,
+		type: String,
+		default: "bias",
+		choices: {
+			full: "DICE_MASTER.settings.cheatStrategy.full",
+			bias: "DICE_MASTER.settings.cheatStrategy.bias",
+			nudge: "DICE_MASTER.settings.cheatStrategy.nudge",
+			threshold: "DICE_MASTER.settings.cheatStrategy.threshold"
+		}
+	});
+	s$2().register(MODULE_ID, "positiveDirection", {
+		name: "DICE_MASTER.settings.positiveDirection.name",
+		hint: "DICE_MASTER.settings.positiveDirection.hint",
+		scope: "world",
+		config: true,
+		type: String,
+		default: "higher",
+		choices: {
+			higher: "DICE_MASTER.settings.positiveDirection.higher",
+			lower: "DICE_MASTER.settings.positiveDirection.lower"
+		}
+	});
+	s$2().register(MODULE_ID, "thresholdPercent", {
+		name: "DICE_MASTER.settings.thresholdPercent.name",
+		hint: "DICE_MASTER.settings.thresholdPercent.hint",
+		scope: "world",
+		config: true,
+		type: Number,
+		default: 25,
+		range: {
+			min: 1,
+			max: 50,
+			step: 1
+		}
+	});
+	s$2().register(MODULE_ID, "explicitMode", {
+		name: "DICE_MASTER.settings.explicitMode.name",
+		hint: "DICE_MASTER.settings.explicitMode.hint",
+		scope: "world",
+		config: true,
+		type: Boolean,
+		default: false
+	});
+	s$2().register(MODULE_ID, "debugMode", {
+		name: "DICE_MASTER.settings.debugMode.name",
+		hint: "DICE_MASTER.settings.debugMode.hint",
+		scope: "world",
+		config: true,
+		type: Boolean,
+		default: false
+	});
+	s$2().registerMenu(MODULE_ID, "diceSettingsMenu", {
+		name: "DICE_MASTER.settings.diceSettingsMenu.name",
+		label: "DICE_MASTER.settings.diceSettingsMenu.label",
+		hint: "DICE_MASTER.settings.diceSettingsMenu.hint",
+		icon: "fas fa-dice",
+		type: DiceMasterSettingsMenu,
+		restricted: true
+	});
+	s$2().register(MODULE_ID, "positiveDirectionOverrides", {
+		scope: "world",
+		config: false,
+		type: Object,
+		default: {}
+	});
+	s$2().register(MODULE_ID, "nudgeValues", {
+		scope: "world",
+		config: false,
+		type: Object,
+		default: DEFAULT_NUDGE_VALUES
+	});
+	s$2().register(MODULE_ID, "biasBetterLimits", {
+		scope: "world",
+		config: false,
+		type: Object,
+		default: DEFAULT_BIAS_LIMITS
+	});
+	s$2().register(MODULE_ID, "biasWorseLimits", {
+		scope: "world",
+		config: false,
+		type: Object,
+		default: DEFAULT_BIAS_LIMITS
+	});
+	s$2().register(MODULE_ID, "affectedDice", {
+		scope: "world",
+		config: false,
+		type: Object,
+		default: DEFAULT_AFFECTED_DICE
+	});
+	s$2().register(MODULE_ID, "cheatStatePlayers", {
+		scope: "world",
+		config: false,
+		type: String,
+		default: "off"
+	});
+	s$2().register(MODULE_ID, "cheatStateGm", {
+		scope: "world",
+		config: false,
+		type: String,
+		default: "off"
+	});
+	s$2().register(MODULE_ID, "cheatStatePlayerOverrides", {
+		scope: "world",
+		config: false,
+		type: Object,
+		default: {}
+	});
+	s$2().register(MODULE_ID, "stateSchemaVersion", {
+		scope: "world",
+		config: false,
+		type: Number,
+		default: 0
+	});
+	s$2().register(MODULE_ID, "widgetPosition", {
+		scope: "client",
+		config: false,
+		type: Object,
+		default: {
+			top: 100,
+			left: 100
+		}
+	});
+}

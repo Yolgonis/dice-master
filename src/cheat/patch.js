@@ -1,0 +1,178 @@
+function getDieType(faces) {
+	const key = `d${faces}`;
+	return [
+		"d4",
+		"d6",
+		"d8",
+		"d10",
+		"d12",
+		"d20",
+		"d100"
+	].includes(key) ? key : null;
+}
+function applyPendingAdvantageSelection(die) {
+	const expansion = die.options?.pending?.advantage;
+	if (!expansion) return null;
+	const modifierIndex = die.modifiers.findIndex((modifier) => /^(adv|dis)\d*/i.test(modifier));
+	if (modifierIndex < 0) return null;
+	const modifier = die.modifiers.splice(modifierIndex, 1)[0];
+	const count = Number(expansion.count);
+	const size = Number(expansion.size);
+	if (!Number.isInteger(count) || count < 1 || !Number.isInteger(size) || size < 1) {
+		die.modifiers.splice(modifierIndex, 0, modifier);
+		return null;
+	}
+	const sets = Array(count + 1);
+	let targetTotal = expansion.adv ? -Infinity : Infinity;
+	for (const index of sets.keys()) {
+		const startIndex = size * index;
+		const results = die.results.slice(startIndex, startIndex + size);
+		if (results.length !== size) {
+			die.modifiers.splice(modifierIndex, 0, modifier);
+			return null;
+		}
+		const total = results.reduce((sum, result) => sum + result.result, 0);
+		sets[index] = { results, total };
+		targetTotal = Math[expansion.adv ? "max" : "min"](targetTotal, total);
+	}
+	sets.forEach((set) => set.results.forEach((result) => {
+		result.active = true;
+		delete result.discarded;
+	}));
+	let kept = false;
+	for (const set of sets) {
+		if (!kept && set.total === targetTotal) {
+			kept = true;
+			continue;
+		}
+		set.results.forEach((result) => {
+			result.discarded = true;
+			result.active = false;
+		});
+	}
+	delete die.options.pending.advantage;
+	return modifier.toLowerCase();
+}
+function repairPendingAdvantageSelection(die) {
+	const expansion = die.options?.pending?.advantage;
+	if (!expansion) return null;
+	const fallbackModifier = `${expansion.adv ? "adv" : "dis"}${expansion.adv && expansion.count > 1 ? expansion.count : ""}`;
+	die.modifiers.unshift(fallbackModifier);
+	const repairedModifier = applyPendingAdvantageSelection(die);
+	if (!repairedModifier) {
+		const fallbackIndex = die.modifiers.indexOf(fallbackModifier);
+		if (fallbackIndex >= 0) die.modifiers.splice(fallbackIndex, 1);
+		return null;
+	}
+	if (!expansion.adv) {
+		const erroneousDropIndex = die.modifiers.indexOf("d");
+		if (erroneousDropIndex >= 0) die.modifiers.splice(erroneousDropIndex, 1);
+	}
+	return repairedModifier;
+}
+var pendingCheatedRoll = false;
+var pendingDebugInfo = [];
+function consumePendingCheatedRoll() {
+	if (!pendingCheatedRoll) return false;
+	pendingCheatedRoll = false;
+	return true;
+}
+function consumePendingDebugInfo() {
+	const info = pendingDebugInfo;
+	pendingDebugInfo = [];
+	return info;
+}
+function patchRollEvaluate() {
+	const dieProto = foundry.dice.terms.Die.prototype;
+	const originalRoll = dieProto.roll;
+	if (!originalRoll?._diceMasterPatched) {
+		dieProto.roll = async function patchedRoll(options) {
+			const result = await originalRoll.call(this, options);
+			const controllerUserId = dieControllerUserIds.get(this) ?? getLocalControllerUserId();
+			const config = getCheatConfig(controllerUserId);
+			const { faces } = this;
+			if (!faces) return result;
+			const dieType = getDieType(faces);
+			if (!dieType || !isDieAffected(dieType)) return result;
+			const originalResult = result.result;
+			if (config.state === "off") return result;
+			const positiveDirection = getPositiveDirection(dieType);
+			const direction = resolveDirection(config.state, positiveDirection);
+			if (!direction) return result;
+			const context = {
+				state: config.state,
+				direction,
+				faces,
+				nudgeValue: getNudgeValue(dieType),
+				biasBetterLimit: getBiasLimit(dieType, "better"),
+				biasWorseLimit: getBiasLimit(dieType, "worse"),
+				thresholdPercent: config.thresholdPercent
+			};
+			const debug = applyStrategy(config.strategy, [result], context);
+			this._diceMasterInfluenced = true;
+			this._diceMasterDirection = config.state;
+			this._fumbleSwitchCheated = true;
+			this._fumbleSwitchDirection = config.state;
+			if (config.debugMode) {
+				const info = {
+					dieType,
+					faces,
+					strategy: config.strategy,
+					state: config.state,
+					controller: getControllerLabel(controllerUserId),
+					controllerTrace: dieControllerTraces.get(this) ?? `local-die->${controllerUserId ?? "unknown"}`,
+					direction,
+					originalResult,
+					finalResult: result.result,
+					...debug
+				};
+				if (!this._diceMasterDebug) this._diceMasterDebug = [];
+				this._diceMasterDebug.push(info);
+				this._fumbleSwitchDebug = this._diceMasterDebug;
+			}
+			return result;
+		};
+		Object.defineProperty(dieProto.roll, "_diceMasterPatched", { value: true });
+	}
+	const originalEvaluateModifiers = dieProto._evaluateModifiers;
+	if (!originalEvaluateModifiers?._diceMasterPatched) {
+		dieProto._evaluateModifiers = async function patchedEvaluateModifiers(...args) {
+			let advantageModifier = applyPendingAdvantageSelection(this);
+			const evaluated = await originalEvaluateModifiers.apply(this, args);
+			advantageModifier ??= repairPendingAdvantageSelection(this);
+			if (advantageModifier) this.modifiers.unshift(advantageModifier);
+			return evaluated;
+		};
+		Object.defineProperty(dieProto._evaluateModifiers, "_diceMasterPatched", { value: true });
+	}
+	const rollProto = Roll.prototype;
+	const originalEvaluate = rollProto.evaluate;
+	if (!originalEvaluate?._diceMasterPatched) {
+		rollProto.evaluate = async function patchedEvaluate(options) {
+			const controllerUserId = rollControllerUserIds.get(this) ?? getLocalControllerUserId();
+			const source = rollControllerTraces.get(this) ?? `local-roll:${this.id ?? this._id ?? "anonymous"}`;
+			if (controllerUserId) bindRollController(this, controllerUserId, source);
+			const result = await originalEvaluate.call(this, options);
+			const config = getCheatConfig(controllerUserId);
+			if (!config.explicitMode && !config.debugMode) return result;
+			if (!result.terms.some((term) => term._diceMasterInfluenced || term._fumbleSwitchCheated)) return result;
+			if (config.explicitMode) {
+				result.options.diceMasterInfluenced = true;
+				result.options.diceMasterDirection = config.state;
+				result.options.fumbleSwitchCheated = true;
+				result.options.fumbleSwitchDirection = config.state;
+				pendingCheatedRoll = true;
+			}
+			if (config.debugMode) {
+				const debugInfo = result.terms.flatMap((term) => term._diceMasterDebug ?? term._fumbleSwitchDebug ?? []);
+				if (debugInfo.length > 0) {
+					result.options.diceMasterDebug = debugInfo;
+					result.options.fumbleSwitchDebug = debugInfo;
+					pendingDebugInfo.push(...debugInfo);
+				}
+			}
+			return result;
+		};
+		Object.defineProperty(rollProto.evaluate, "_diceMasterPatched", { value: true });
+	}
+}
