@@ -1,17 +1,17 @@
 var s$2 = () => game.settings;
 function registerSettings() {
-	s$2().register(MODULE_ID, "cheatStrategy", {
-		name: "DICE_MASTER.settings.cheatStrategy.name",
-		hint: "DICE_MASTER.settings.cheatStrategy.hint",
+	s$2().register(MODULE_ID, "influenceStrategy", {
+		name: "DICE_MASTER.settings.influenceStrategy.name",
+		hint: "DICE_MASTER.settings.influenceStrategy.hint",
 		scope: "world",
 		config: true,
 		type: String,
 		default: "bias",
 		choices: {
-			full: "DICE_MASTER.settings.cheatStrategy.full",
-			bias: "DICE_MASTER.settings.cheatStrategy.bias",
-			nudge: "DICE_MASTER.settings.cheatStrategy.nudge",
-			threshold: "DICE_MASTER.settings.cheatStrategy.threshold"
+			full: "DICE_MASTER.settings.influenceStrategy.full",
+			bias: "DICE_MASTER.settings.influenceStrategy.bias",
+			nudge: "DICE_MASTER.settings.influenceStrategy.nudge",
+			threshold: "DICE_MASTER.settings.influenceStrategy.threshold"
 		}
 	});
 	s$2().register(MODULE_ID, "positiveDirection", {
@@ -93,19 +93,19 @@ function registerSettings() {
 		type: Object,
 		default: DEFAULT_AFFECTED_DICE
 	});
-	s$2().register(MODULE_ID, "cheatStatePlayers", {
+	s$2().register(MODULE_ID, "influenceStatePlayers", {
 		scope: "world",
 		config: false,
 		type: String,
 		default: "off"
 	});
-	s$2().register(MODULE_ID, "cheatStateGm", {
+	s$2().register(MODULE_ID, "influenceStateGm", {
 		scope: "world",
 		config: false,
 		type: String,
 		default: "off"
 	});
-	s$2().register(MODULE_ID, "cheatStatePlayerOverrides", {
+	s$2().register(MODULE_ID, "influenceStatePlayerOverrides", {
 		scope: "world",
 		config: false,
 		type: Object,

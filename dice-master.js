@@ -1,6 +1,6 @@
 //#region src/constants.ts
 var MODULE_ID = "dice-master";
-var MODULE_VERSION = "0.7.1";
+var MODULE_VERSION = "0.8.0";
 var SOCKET_NAME = `module.${MODULE_ID}`;
 var socketlibModule = null;
 var DIE_TYPES = [
@@ -99,23 +99,22 @@ var DiceMasterSettingsMenu = class extends foundry.appv1.api.FormApplication {
 		await s$3().set(MODULE_ID, "positiveDirectionOverrides", overrides);
 	}
 };
-var FumbleSwitchSettingsMenu = DiceMasterSettingsMenu;
 //#endregion
 //#region src/settings.ts
 var s$2 = () => game.settings;
 function registerSettings() {
-	s$2().register(MODULE_ID, "cheatStrategy", {
-		name: "DICE_MASTER.settings.cheatStrategy.name",
-		hint: "DICE_MASTER.settings.cheatStrategy.hint",
+	s$2().register(MODULE_ID, "influenceStrategy", {
+		name: "DICE_MASTER.settings.influenceStrategy.name",
+		hint: "DICE_MASTER.settings.influenceStrategy.hint",
 		scope: "world",
 		config: true,
 		type: String,
 		default: "bias",
 		choices: {
-			full: "DICE_MASTER.settings.cheatStrategy.full",
-			bias: "DICE_MASTER.settings.cheatStrategy.bias",
-			nudge: "DICE_MASTER.settings.cheatStrategy.nudge",
-			threshold: "DICE_MASTER.settings.cheatStrategy.threshold"
+			full: "DICE_MASTER.settings.influenceStrategy.full",
+			bias: "DICE_MASTER.settings.influenceStrategy.bias",
+			nudge: "DICE_MASTER.settings.influenceStrategy.nudge",
+			threshold: "DICE_MASTER.settings.influenceStrategy.threshold"
 		}
 	});
 	s$2().register(MODULE_ID, "positiveDirection", {
@@ -197,19 +196,19 @@ function registerSettings() {
 		type: Object,
 		default: DEFAULT_AFFECTED_DICE
 	});
-	s$2().register(MODULE_ID, "cheatStatePlayers", {
+	s$2().register(MODULE_ID, "influenceStatePlayers", {
 		scope: "world",
 		config: false,
 		type: String,
 		default: "off"
 	});
-	s$2().register(MODULE_ID, "cheatStateGm", {
+	s$2().register(MODULE_ID, "influenceStateGm", {
 		scope: "world",
 		config: false,
 		type: String,
 		default: "off"
 	});
-	s$2().register(MODULE_ID, "cheatStatePlayerOverrides", {
+	s$2().register(MODULE_ID, "influenceStatePlayerOverrides", {
 		scope: "world",
 		config: false,
 		type: Object,
@@ -232,9 +231,9 @@ function registerSettings() {
 	});
 }
 //#endregion
-//#region src/cheat/state.ts
+//#region src/influence/state.ts
 var s$1 = () => game.settings;
-var syncedCheatState = null;
+var syncedInfluenceState = null;
 var dieControllerUserIds = /* @__PURE__ */ new WeakMap();
 var rollControllerUserIds = /* @__PURE__ */ new WeakMap();
 var dieControllerTraces = /* @__PURE__ */ new WeakMap();
@@ -245,21 +244,21 @@ var pendingRollController = null;
 var lastRollControllerTrace = "none";
 var recentRemoteIntentIds = /* @__PURE__ */ new Map();
 var ROLL_CONTEXT_TTL = 45e3;
-function readCheatStateSnapshot() {
+function readInfluenceStateSnapshot() {
 	return {
-		players: s$1().get(MODULE_ID, "cheatStatePlayers"),
-		gm: s$1().get(MODULE_ID, "cheatStateGm"),
-		playerOverrides: { ...s$1().get(MODULE_ID, "cheatStatePlayerOverrides") }
+		players: s$1().get(MODULE_ID, "influenceStatePlayers"),
+		gm: s$1().get(MODULE_ID, "influenceStateGm"),
+		playerOverrides: { ...s$1().get(MODULE_ID, "influenceStatePlayerOverrides") }
 	};
 }
-function isCheatState(value) {
+function isInfluenceState(value) {
 	return value === "off" || value === "better" || value === "worse";
 }
 function isPlayerOverrideState(value) {
-	return value === "inherit" || isCheatState(value);
+	return value === "inherit" || isInfluenceState(value);
 }
-function normalizeCheatStateSnapshot(snapshot) {
-	if (!snapshot || !isCheatState(snapshot.players) || !isCheatState(snapshot.gm)) return null;
+function normalizeInfluenceStateSnapshot(snapshot) {
+	if (!snapshot || !isInfluenceState(snapshot.players) || !isInfluenceState(snapshot.gm)) return null;
 	const playerOverrides = {};
 	if (snapshot.playerOverrides && typeof snapshot.playerOverrides === "object") {
 		for (const [userId, state] of Object.entries(snapshot.playerOverrides)) {
@@ -272,29 +271,29 @@ function normalizeCheatStateSnapshot(snapshot) {
 		playerOverrides
 	};
 }
-function applyCheatStateSnapshot(snapshot) {
-	const normalized = normalizeCheatStateSnapshot(snapshot);
-	if (normalized) syncedCheatState = normalized;
+function applyInfluenceStateSnapshot(snapshot) {
+	const normalized = normalizeInfluenceStateSnapshot(snapshot);
+	if (normalized) syncedInfluenceState = normalized;
 }
-function sendCheatStateSnapshot(targetUserId = null) {
-	const snapshot = readCheatStateSnapshot();
-	applyCheatStateSnapshot(snapshot);
+function sendInfluenceStateSnapshot(targetUserId = null) {
+	const snapshot = readInfluenceStateSnapshot();
+	applyInfluenceStateSnapshot(snapshot);
 	game.socket?.emit(SOCKET_NAME, {
-		type: "cheat-state",
+		type: "influence-state",
 		targetUserId,
 		snapshot
 	});
 }
-function broadcastCheatStateSnapshot() {
-	sendCheatStateSnapshot();
+function broadcastInfluenceStateSnapshot() {
+	sendInfluenceStateSnapshot();
 }
-function isAuthorizedCheatStateSender(senderId) {
+function isAuthorizedInfluenceStateSender(senderId) {
 	if (typeof senderId !== "string") return false;
 	const sender = game.users?.get?.(senderId);
 	return Boolean(sender?.isGM && sender.active);
 }
-function initCheatStateSync() {
-	applyCheatStateSnapshot(readCheatStateSnapshot());
+function initInfluenceStateSync() {
+	applyInfluenceStateSnapshot(readInfluenceStateSnapshot());
 	game.socket?.on(SOCKET_NAME, (payload, senderId) => {
 		if (payload?.type === "roll-intent") {
 			applyRemoteRollIntent({ ...payload, userId: senderId ?? payload.userId }, "raw-socket");
@@ -304,32 +303,32 @@ function initCheatStateSync() {
 			applyRemoteRollController({ ...payload, userId: senderId ?? payload.userId }, "raw-socket");
 			return;
 		}
-		if (payload?.type === "request-cheat-state") {
-			if (game.user?.isGM && typeof payload.userId === "string") sendCheatStateSnapshot(payload.userId);
+		if (payload?.type === "request-influence-state") {
+			if (game.user?.isGM && typeof payload.userId === "string") sendInfluenceStateSnapshot(payload.userId);
 			return;
 		}
-		if (payload?.type !== "cheat-state") return;
-		if (!isAuthorizedCheatStateSender(senderId)) return;
+		if (payload?.type !== "influence-state") return;
+		if (!isAuthorizedInfluenceStateSender(senderId)) return;
 		if (payload.targetUserId && payload.targetUserId !== game.user?.id) return;
-		applyCheatStateSnapshot(payload.snapshot);
+		applyInfluenceStateSnapshot(payload.snapshot);
 	});
 	Hooks.on("updateSetting", (setting) => {
 		const key = String(setting?.key ?? "");
-		if (!key.startsWith(`${MODULE_ID}.cheatState`)) return;
-		applyCheatStateSnapshot(readCheatStateSnapshot());
-		if (key === `${MODULE_ID}.cheatStatePlayers`) localState.cheatStatePlayers = s$1().get(MODULE_ID, "cheatStatePlayers");
-		if (key === `${MODULE_ID}.cheatStateGm`) localState.cheatStateGm = s$1().get(MODULE_ID, "cheatStateGm");
-		if (key === `${MODULE_ID}.cheatStatePlayerOverrides`) playerOverrides = { ...s$1().get(MODULE_ID, "cheatStatePlayerOverrides") };
+		if (!key.startsWith(`${MODULE_ID}.influenceState`)) return;
+		applyInfluenceStateSnapshot(readInfluenceStateSnapshot());
+		if (key === `${MODULE_ID}.influenceStatePlayers`) localState.influenceStatePlayers = s$1().get(MODULE_ID, "influenceStatePlayers");
+		if (key === `${MODULE_ID}.influenceStateGm`) localState.influenceStateGm = s$1().get(MODULE_ID, "influenceStateGm");
+		if (key === `${MODULE_ID}.influenceStatePlayerOverrides`) playerOverrides = { ...s$1().get(MODULE_ID, "influenceStatePlayerOverrides") };
 		refreshWidgetControls();
 	});
-	if (game.user?.isGM) broadcastCheatStateSnapshot();
+	if (game.user?.isGM) broadcastInfluenceStateSnapshot();
 	else if (game.user?.id) game.socket?.emit(SOCKET_NAME, {
-		type: "request-cheat-state",
+		type: "request-influence-state",
 		userId: game.user.id
 	});
 }
-function getCheatState(controllerUserId = null) {
-	const snapshot = syncedCheatState ?? readCheatStateSnapshot();
+function getInfluenceState(controllerUserId = null) {
+	const snapshot = syncedInfluenceState ?? readInfluenceStateSnapshot();
 	const userId = controllerUserId ?? game.user?.id ?? null;
 	const controller = userId ? game.users?.get?.(userId) : null;
 	if (controller?.isGM) return snapshot.gm;
@@ -340,23 +339,41 @@ function getCheatState(controllerUserId = null) {
 	}
 	return game.user?.isGM ? snapshot.gm : snapshot.players;
 }
+var LEGACY_SETTING_KEYS = {
+	cheatStrategy: "influenceStrategy",
+	cheatStatePlayers: "influenceStatePlayers",
+	cheatStateGm: "influenceStateGm",
+	cheatStatePlayerOverrides: "influenceStatePlayerOverrides"
+};
+async function migrateLegacySettingKeys() {
+	const activeGm = game.users?.activeGM;
+	if (activeGm ? !activeGm.isSelf : !(game.user?.isGM ?? false)) return;
+	const storage = game.settings?.storage?.get?.("world");
+	if (typeof storage?.getSetting !== "function") return;
+	for (const [legacyKey, key] of Object.entries(LEGACY_SETTING_KEYS)) {
+		const legacy = storage.getSetting(`${MODULE_ID}.${legacyKey}`);
+		if (!legacy) continue;
+		if (!storage.getSetting(`${MODULE_ID}.${key}`)) await s$1().set(MODULE_ID, key, legacy.value);
+		await legacy.delete();
+	}
+}
 async function migratePlayerOverrideState() {
 	if (!(game.user?.isGM ?? false)) return;
 	const schemaVersion = Number(s$1().get(MODULE_ID, "stateSchemaVersion") ?? 0);
 	if (schemaVersion >= 2) return;
-	const saved = s$1().get(MODULE_ID, "cheatStatePlayerOverrides") ?? {};
+	const saved = s$1().get(MODULE_ID, "influenceStatePlayerOverrides") ?? {};
 	const migrated = {};
 	for (const [userId, state] of Object.entries(saved)) {
 		migrated[userId] = state === "off" ? "inherit" : isPlayerOverrideState(state) ? state : "inherit";
 	}
-	await s$1().set(MODULE_ID, "cheatStatePlayerOverrides", migrated);
+	await s$1().set(MODULE_ID, "influenceStatePlayerOverrides", migrated);
 	await s$1().set(MODULE_ID, "stateSchemaVersion", 2);
-	applyCheatStateSnapshot(readCheatStateSnapshot());
+	applyInfluenceStateSnapshot(readInfluenceStateSnapshot());
 }
-function getCheatConfig(controllerUserId = null) {
+function getInfluenceConfig(controllerUserId = null) {
 	return {
-		state: getCheatState(controllerUserId),
-		strategy: s$1().get(MODULE_ID, "cheatStrategy"),
+		state: getInfluenceState(controllerUserId),
+		strategy: s$1().get(MODULE_ID, "influenceStrategy"),
 		thresholdPercent: s$1().get(MODULE_ID, "thresholdPercent"),
 		explicitMode: s$1().get(MODULE_ID, "explicitMode"),
 		debugMode: s$1().get(MODULE_ID, "debugMode")
@@ -687,7 +704,7 @@ function registerRollControllerHooks() {
 function patchDnd5eBuildEvaluate() {
 	const rollClass = CONFIG.Dice?.BasicRoll;
 	const originalBuildEvaluate = rollClass?.buildEvaluate;
-	if (typeof originalBuildEvaluate !== "function" || originalBuildEvaluate._fumbleSwitchCustomPatched) return;
+	if (typeof originalBuildEvaluate !== "function") return;
 	installWrapper(rollClass, "CONFIG.Dice.BasicRoll", "buildEvaluate", async function patchedBuildEvaluate(wrapped, rolls, config = {}, message = {}) {
 		const actor = resolveActorFromRollContext(config, message);
 		const workflow = getWorkflowFromContext(config);
@@ -723,14 +740,14 @@ function getBiasLimit(dieType, state) {
 	return Number.isFinite(value) ? Math.max(0, Math.min(faces, Math.trunc(value))) : 0;
 }
 //#endregion
-//#region src/cheat/strategies/full.ts
+//#region src/influence/strategies/full.ts
 function applyFull(results, context) {
 	results.filter((r) => r.active).forEach((r) => {
 		r.result = context.direction === "better" ? context.faces : 1;
 	});
 }
 //#endregion
-//#region src/cheat/strategies/bias.ts
+//#region src/influence/strategies/bias.ts
 function randomInt$1(min, max) {
 	return Math.floor(Math.random() * (max - min + 1)) + min;
 }
@@ -753,7 +770,7 @@ function applyBias(results, context) {
 	return { biasSecondRoll: secondRoll, biasLimit: limit, biasLimitApplied: limitApplied };
 }
 //#endregion
-//#region src/cheat/strategies/nudge.ts
+//#region src/influence/strategies/nudge.ts
 function applyNudge(results, context) {
 	const delta = context.direction === "better" ? context.nudgeValue : -context.nudgeValue;
 	results.filter((r) => r.active).forEach((r) => {
@@ -762,7 +779,7 @@ function applyNudge(results, context) {
 	return { nudgeDelta: delta };
 }
 //#endregion
-//#region src/cheat/strategies/threshold.ts
+//#region src/influence/strategies/threshold.ts
 function randomInt(min, max) {
 	return Math.floor(Math.random() * (max - min + 1)) + min;
 }
@@ -784,7 +801,7 @@ function applyThreshold(results, context) {
 	};
 }
 //#endregion
-//#region src/cheat/strategies/index.ts
+//#region src/influence/strategies/index.ts
 function resolveDirection(state, positiveDirection) {
 	if (state === "off") return null;
 	if (positiveDirection === "lower") return state === "better" ? "worse" : "better";
@@ -802,7 +819,7 @@ function applyStrategy(strategy, results, context) {
 	}
 }
 //#endregion
-//#region src/cheat/patch.ts
+//#region src/influence/patch.ts
 function getDieType(faces) {
 	const key = `d${faces}`;
 	return [
@@ -875,11 +892,11 @@ function repairPendingAdvantageSelection(die) {
 	}
 	return repairedModifier;
 }
-var pendingCheatedRoll = false;
+var pendingInfluencedRoll = false;
 var pendingDebugInfo = [];
-function consumePendingCheatedRoll() {
-	if (!pendingCheatedRoll) return false;
-	pendingCheatedRoll = false;
+function consumePendingInfluencedRoll() {
+	if (!pendingInfluencedRoll) return false;
+	pendingInfluencedRoll = false;
 	return true;
 }
 function consumePendingDebugInfo() {
@@ -913,7 +930,7 @@ function patchRollEvaluate() {
 	installWrapper(foundry.dice.terms.Die.prototype, "foundry.dice.terms.Die.prototype", "roll", async function patchedRoll(wrapped, options) {
 		const result = await wrapped(options);
 		const controllerUserId = dieControllerUserIds.get(this) ?? getLocalControllerUserId();
-		const config = getCheatConfig(controllerUserId);
+		const config = getInfluenceConfig(controllerUserId);
 		const { faces } = this;
 		if (!faces) return result;
 		const dieType = getDieType(faces);
@@ -935,8 +952,6 @@ function patchRollEvaluate() {
 		const debug = applyStrategy(config.strategy, [result], context);
 		this._diceMasterInfluenced = true;
 		this._diceMasterDirection = config.state;
-		this._fumbleSwitchCheated = true;
-		this._fumbleSwitchDirection = config.state;
 		if (config.debugMode) {
 			const info = {
 				dieType,
@@ -952,7 +967,6 @@ function patchRollEvaluate() {
 			};
 			if (!this._diceMasterDebug) this._diceMasterDebug = [];
 			this._diceMasterDebug.push(info);
-			this._fumbleSwitchDebug = this._diceMasterDebug;
 		}
 		return result;
 	});
@@ -968,21 +982,18 @@ function patchRollEvaluate() {
 		const source = rollControllerTraces.get(this) ?? `local-roll:${this.id ?? this._id ?? "anonymous"}`;
 		if (controllerUserId) bindRollController(this, controllerUserId, source);
 		const result = await wrapped(options);
-		const config = getCheatConfig(controllerUserId);
+		const config = getInfluenceConfig(controllerUserId);
 		if (!config.explicitMode && !config.debugMode) return result;
-		if (!result.terms.some((term) => term._diceMasterInfluenced || term._fumbleSwitchCheated)) return result;
+		if (!result.terms.some((term) => term._diceMasterInfluenced)) return result;
 		if (config.explicitMode) {
 			result.options.diceMasterInfluenced = true;
 			result.options.diceMasterDirection = config.state;
-			result.options.fumbleSwitchCheated = true;
-			result.options.fumbleSwitchDirection = config.state;
-			pendingCheatedRoll = true;
+			pendingInfluencedRoll = true;
 		}
 		if (config.debugMode) {
-			const debugInfo = result.terms.flatMap((term) => term._diceMasterDebug ?? term._fumbleSwitchDebug ?? []);
+			const debugInfo = result.terms.flatMap((term) => term._diceMasterDebug ?? []);
 			if (debugInfo.length > 0) {
 				result.options.diceMasterDebug = debugInfo;
-				result.options.fumbleSwitchDebug = debugInfo;
 				pendingDebugInfo.push(...debugInfo);
 			}
 		}
@@ -1019,15 +1030,15 @@ var widget;
 var playersContainer;
 var playerRows = /* @__PURE__ */ new Map();
 var localState = {
-	cheatStatePlayers: "off",
-	cheatStateGm: "off"
+	influenceStatePlayers: "off",
+	influenceStateGm: "off"
 };
 var playerOverrides = {};
 function hasActiveOverride() {
 	return Object.values(playerOverrides).some((state) => state === "better" || state === "worse");
 }
 function getWidgetStateClass() {
-	const { cheatStatePlayers: players, cheatStateGm: gm } = localState;
+	const { influenceStatePlayers: players, influenceStateGm: gm } = localState;
 	if (players !== "off") return `dice-master--${players}`;
 	if (hasActiveOverride()) {
 		const firstActive = Object.values(playerOverrides).find((state) => state === "better" || state === "worse");
@@ -1045,7 +1056,7 @@ function getStateTitle(state) {
 }
 function getEffectivePlayerState(userId) {
 	const override = playerOverrides[userId] ?? "inherit";
-	return override === "inherit" ? localState.cheatStatePlayers : override;
+	return override === "inherit" ? localState.influenceStatePlayers : override;
 }
 function updatePlayerRowEffective(userId) {
 	const row = playerRows.get(userId);
@@ -1132,9 +1143,9 @@ function createToggleRow(label, settingKey, currentState) {
 			buttons.querySelectorAll(".dice-master__btn").forEach((b) => b.classList.remove("dice-master__btn--active"));
 			btn.classList.add("dice-master__btn--active");
 			updateWidgetClass();
-			if (settingKey === "cheatStatePlayers") for (const userId of playerRows.keys()) updatePlayerRowEffective(userId);
+			if (settingKey === "influenceStatePlayers") for (const userId of playerRows.keys()) updatePlayerRowEffective(userId);
 			await s().set(MODULE_ID, settingKey, state);
-			broadcastCheatStateSnapshot();
+			broadcastInfluenceStateSnapshot();
 		});
 		buttons.appendChild(btn);
 	});
@@ -1142,8 +1153,8 @@ function createToggleRow(label, settingKey, currentState) {
 	return row;
 }
 async function savePlayerOverrides() {
-	await s().set(MODULE_ID, "cheatStatePlayerOverrides", { ...playerOverrides });
-	broadcastCheatStateSnapshot();
+	await s().set(MODULE_ID, "influenceStatePlayerOverrides", { ...playerOverrides });
+	broadcastInfluenceStateSnapshot();
 }
 function createPlayerRow(user, userId) {
 	const row = document.createElement("div");
@@ -1201,15 +1212,15 @@ function removePlayerFromWidget(userId) {
 async function applyPreset(presetId) {
 	const preset = PRESETS.find((entry) => entry.id === presetId);
 	if (!preset || !(game.user?.isGM ?? false)) return;
-	localState.cheatStatePlayers = preset.players;
-	localState.cheatStateGm = preset.gm;
+	localState.influenceStatePlayers = preset.players;
+	localState.influenceStateGm = preset.gm;
 	playerOverrides = {};
-	await s().set(MODULE_ID, "cheatStatePlayers", preset.players);
-	await s().set(MODULE_ID, "cheatStateGm", preset.gm);
-	await s().set(MODULE_ID, "cheatStatePlayerOverrides", {});
-	applyCheatStateSnapshot(readCheatStateSnapshot());
+	await s().set(MODULE_ID, "influenceStatePlayers", preset.players);
+	await s().set(MODULE_ID, "influenceStateGm", preset.gm);
+	await s().set(MODULE_ID, "influenceStatePlayerOverrides", {});
+	applyInfluenceStateSnapshot(readInfluenceStateSnapshot());
 	refreshWidgetControls();
-	broadcastCheatStateSnapshot();
+	broadcastInfluenceStateSnapshot();
 }
 function createPresetControls() {
 	const section = document.createElement("div");
@@ -1261,9 +1272,9 @@ function renderWidget() {
 		widget.hidden = false;
 		return;
 	}
-	localState.cheatStatePlayers = s().get(MODULE_ID, "cheatStatePlayers");
-	localState.cheatStateGm = s().get(MODULE_ID, "cheatStateGm");
-	const savedOverrides = s().get(MODULE_ID, "cheatStatePlayerOverrides");
+	localState.influenceStatePlayers = s().get(MODULE_ID, "influenceStatePlayers");
+	localState.influenceStateGm = s().get(MODULE_ID, "influenceStateGm");
+	const savedOverrides = s().get(MODULE_ID, "influenceStatePlayerOverrides");
 	playerOverrides = { ...savedOverrides };
 	playerRows.clear();
 	widget = document.createElement("div");
@@ -1300,14 +1311,14 @@ function renderWidget() {
 	header.appendChild(headerActions);
 	widget.appendChild(header);
 	widget.appendChild(createPresetControls());
-	widget.appendChild(createToggleRow(game.i18n.localize("DICE_MASTER.widget.players"), "cheatStatePlayers", localState.cheatStatePlayers));
+	widget.appendChild(createToggleRow(game.i18n.localize("DICE_MASTER.widget.players"), "influenceStatePlayers", localState.influenceStatePlayers));
 	playersContainer = document.createElement("div");
 	playersContainer.classList.add("dice-master__players");
 	widget.appendChild(playersContainer);
 	game.users?.forEach((user) => {
 		if (!user.isGM && user.active) addPlayerToWidget(user);
 	});
-	widget.appendChild(createToggleRow(game.i18n.localize("DICE_MASTER.widget.gm"), "cheatStateGm", localState.cheatStateGm));
+	widget.appendChild(createToggleRow(game.i18n.localize("DICE_MASTER.widget.gm"), "influenceStateGm", localState.influenceStateGm));
 	makeDraggable(widget, header);
 	document.body.appendChild(widget);
 	refreshWidgetControls();
@@ -1321,7 +1332,7 @@ function renderWidget() {
 }
 //#endregion
 //#region src/integrations/dice-so-nice.ts
-var CHEAT_COLORS = {
+var INFLUENCE_COLORS = {
 	better: {
 		colorset: "custom",
 		labelColor: "#ffffff",
@@ -1341,8 +1352,8 @@ function onDsnRollStart(_messageId, context) {
 	const { roll } = context;
 	if (!roll) return;
 	const opts = roll.options;
-	if (!(opts?.diceMasterInfluenced ?? opts?.fumbleSwitchCheated)) return;
-	const colors = CHEAT_COLORS[opts.diceMasterDirection ?? opts.fumbleSwitchDirection];
+	if (!(opts?.diceMasterInfluenced)) return;
+	const colors = INFLUENCE_COLORS[opts.diceMasterDirection];
 	if (!colors) return;
 	const explicitMode = game.settings.get(MODULE_ID, "explicitMode");
 	const isGm = game.user?.isGM ?? false;
@@ -1354,7 +1365,7 @@ function initDiceSoNice() {
 	Hooks.on("diceSoNiceRollStart", onDsnRollStart);
 }
 //#endregion
-//#region src/cheat/debug-message.ts
+//#region src/influence/debug-message.ts
 function formatSigned(n) {
 	return n >= 0 ? `+${n}` : `${n}`;
 }
@@ -1440,10 +1451,11 @@ Hooks.once("init", () => {
 	});
 });
 Hooks.once("ready", async () => {
+	await migrateLegacySettingKeys();
 	await migratePlayerOverrideState();
 	patchDnd5eBuildEvaluate();
 	initSocketlibIntegration();
-	initCheatStateSync();
+	initInfluenceStateSync();
 	initSocketActivityCapture();
 	initRollIntentRelay();
 	initDiceSoNice();
@@ -1454,9 +1466,9 @@ Hooks.on("createChatMessage", (message) => {
 	const explicitMode = game.settings.get(MODULE_ID, "explicitMode");
 	const debugMode = game.settings.get(MODULE_ID, "debugMode");
 	if (!explicitMode && !debugMode) return;
-	const hasRollFlag = message.rolls?.some((r) => r.options?.diceMasterInfluenced ?? r.options?.fumbleSwitchCheated);
-	const hasPendingFlag = consumePendingCheatedRoll();
-	const rollDebug = message.rolls?.flatMap((r) => r.options?.diceMasterDebug ?? r.options?.fumbleSwitchDebug ?? []) ?? [];
+	const hasRollFlag = message.rolls?.some((r) => r.options?.diceMasterInfluenced);
+	const hasPendingFlag = consumePendingInfluencedRoll();
+	const rollDebug = message.rolls?.flatMap((r) => r.options?.diceMasterDebug ?? []) ?? [];
 	const pendingDebug = consumePendingDebugInfo();
 	const debugInfo = rollDebug.length > 0 ? rollDebug : pendingDebug;
 	if (!(hasRollFlag || hasPendingFlag || debugInfo.length > 0)) return;

@@ -26,15 +26,15 @@ var widget;
 var playersContainer;
 var playerRows = /* @__PURE__ */ new Map();
 var localState = {
-	cheatStatePlayers: "off",
-	cheatStateGm: "off"
+	influenceStatePlayers: "off",
+	influenceStateGm: "off"
 };
 var playerOverrides = {};
 function hasActiveOverride() {
 	return Object.values(playerOverrides).some((state) => state === "better" || state === "worse");
 }
 function getWidgetStateClass() {
-	const { cheatStatePlayers: players, cheatStateGm: gm } = localState;
+	const { influenceStatePlayers: players, influenceStateGm: gm } = localState;
 	if (players !== "off") return `dice-master--${players}`;
 	if (hasActiveOverride()) {
 		const firstActive = Object.values(playerOverrides).find((state) => state === "better" || state === "worse");
@@ -52,7 +52,7 @@ function getStateTitle(state) {
 }
 function getEffectivePlayerState(userId) {
 	const override = playerOverrides[userId] ?? "inherit";
-	return override === "inherit" ? localState.cheatStatePlayers : override;
+	return override === "inherit" ? localState.influenceStatePlayers : override;
 }
 function updatePlayerRowEffective(userId) {
 	const row = playerRows.get(userId);
@@ -139,9 +139,9 @@ function createToggleRow(label, settingKey, currentState) {
 			buttons.querySelectorAll(".dice-master__btn").forEach((b) => b.classList.remove("dice-master__btn--active"));
 			btn.classList.add("dice-master__btn--active");
 			updateWidgetClass();
-			if (settingKey === "cheatStatePlayers") for (const userId of playerRows.keys()) updatePlayerRowEffective(userId);
+			if (settingKey === "influenceStatePlayers") for (const userId of playerRows.keys()) updatePlayerRowEffective(userId);
 			await s().set(MODULE_ID, settingKey, state);
-			broadcastCheatStateSnapshot();
+			broadcastInfluenceStateSnapshot();
 		});
 		buttons.appendChild(btn);
 	});
@@ -149,8 +149,8 @@ function createToggleRow(label, settingKey, currentState) {
 	return row;
 }
 async function savePlayerOverrides() {
-	await s().set(MODULE_ID, "cheatStatePlayerOverrides", { ...playerOverrides });
-	broadcastCheatStateSnapshot();
+	await s().set(MODULE_ID, "influenceStatePlayerOverrides", { ...playerOverrides });
+	broadcastInfluenceStateSnapshot();
 }
 function createPlayerRow(user, userId) {
 	const row = document.createElement("div");
@@ -208,15 +208,15 @@ function removePlayerFromWidget(userId) {
 async function applyPreset(presetId) {
 	const preset = PRESETS.find((entry) => entry.id === presetId);
 	if (!preset || !(game.user?.isGM ?? false)) return;
-	localState.cheatStatePlayers = preset.players;
-	localState.cheatStateGm = preset.gm;
+	localState.influenceStatePlayers = preset.players;
+	localState.influenceStateGm = preset.gm;
 	playerOverrides = {};
-	await s().set(MODULE_ID, "cheatStatePlayers", preset.players);
-	await s().set(MODULE_ID, "cheatStateGm", preset.gm);
-	await s().set(MODULE_ID, "cheatStatePlayerOverrides", {});
-	applyCheatStateSnapshot(readCheatStateSnapshot());
+	await s().set(MODULE_ID, "influenceStatePlayers", preset.players);
+	await s().set(MODULE_ID, "influenceStateGm", preset.gm);
+	await s().set(MODULE_ID, "influenceStatePlayerOverrides", {});
+	applyInfluenceStateSnapshot(readInfluenceStateSnapshot());
 	refreshWidgetControls();
-	broadcastCheatStateSnapshot();
+	broadcastInfluenceStateSnapshot();
 }
 function createPresetControls() {
 	const section = document.createElement("div");
@@ -268,9 +268,9 @@ function renderWidget() {
 		widget.hidden = false;
 		return;
 	}
-	localState.cheatStatePlayers = s().get(MODULE_ID, "cheatStatePlayers");
-	localState.cheatStateGm = s().get(MODULE_ID, "cheatStateGm");
-	const savedOverrides = s().get(MODULE_ID, "cheatStatePlayerOverrides");
+	localState.influenceStatePlayers = s().get(MODULE_ID, "influenceStatePlayers");
+	localState.influenceStateGm = s().get(MODULE_ID, "influenceStateGm");
+	const savedOverrides = s().get(MODULE_ID, "influenceStatePlayerOverrides");
 	playerOverrides = { ...savedOverrides };
 	playerRows.clear();
 	widget = document.createElement("div");
@@ -307,14 +307,14 @@ function renderWidget() {
 	header.appendChild(headerActions);
 	widget.appendChild(header);
 	widget.appendChild(createPresetControls());
-	widget.appendChild(createToggleRow(game.i18n.localize("DICE_MASTER.widget.players"), "cheatStatePlayers", localState.cheatStatePlayers));
+	widget.appendChild(createToggleRow(game.i18n.localize("DICE_MASTER.widget.players"), "influenceStatePlayers", localState.influenceStatePlayers));
 	playersContainer = document.createElement("div");
 	playersContainer.classList.add("dice-master__players");
 	widget.appendChild(playersContainer);
 	game.users?.forEach((user) => {
 		if (!user.isGM && user.active) addPlayerToWidget(user);
 	});
-	widget.appendChild(createToggleRow(game.i18n.localize("DICE_MASTER.widget.gm"), "cheatStateGm", localState.cheatStateGm));
+	widget.appendChild(createToggleRow(game.i18n.localize("DICE_MASTER.widget.gm"), "influenceStateGm", localState.influenceStateGm));
 	makeDraggable(widget, header);
 	document.body.appendChild(widget);
 	refreshWidgetControls();

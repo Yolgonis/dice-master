@@ -2,6 +2,26 @@
 
 Bu projedeki önemli değişiklikler bu dosyada belgelenir.
 
+## 0.8.0 — 2026-10-16
+
+### Breaking
+
+- 0.7.x geçiş dönemi bitti: `fumbleSwitch*` zar ve roll işaretleri artık yazılmıyor ve okunmuyor; `FumbleSwitchSettingsMenu` alias'ı kaldırıldı. Makro ve entegrasyonlar `diceMasterInfluenced`, `diceMasterDirection` ve `diceMasterDebug` kullanmalı.
+- Ayar anahtarları nötr adlara taşındı: `cheatStrategy` → `influenceStrategy`, `cheatStatePlayers` / `cheatStateGm` / `cheatStatePlayerOverrides` → `influenceState*`. Socket mesaj türleri `influence-state` ve `request-influence-state` oldu; bütün istemciler aynı sürümde olmalı.
+
+### Migration
+
+- Aktif GM ilk açılışta eski `cheat*` dünya ayarlarının değerlerini yeni anahtarlara kopyalar ve eski kayıtları siler. Yeni anahtarda zaten bir değer varsa o korunur.
+
+### Maintainability
+
+- `src/cheat/` klasörü `src/influence/` oldu; iç tanımlayıcılardaki "cheat" adları "influence" ile değiştirildi.
+- İngilizce ve Lehçe arayüz metinlerinden "cheat" / "oszustwo" ifadeleri kaldırıldı ("Influence Strategy", "Strategia wpływu").
+
+### Testing
+
+- Ayar taşıması ve eski işaretlerin yok sayılması için testler eklendi. Test sayısı 35.
+
 ## 0.7.1 — 2026-10-13
 
 ### Compatibility

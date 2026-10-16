@@ -1,5 +1,5 @@
 var s$1 = () => game.settings;
-var syncedCheatState = null;
+var syncedInfluenceState = null;
 var dieControllerUserIds = /* @__PURE__ */ new WeakMap();
 var rollControllerUserIds = /* @__PURE__ */ new WeakMap();
 var dieControllerTraces = /* @__PURE__ */ new WeakMap();
@@ -10,21 +10,21 @@ var pendingRollController = null;
 var lastRollControllerTrace = "none";
 var recentRemoteIntentIds = /* @__PURE__ */ new Map();
 var ROLL_CONTEXT_TTL = 45e3;
-function readCheatStateSnapshot() {
+function readInfluenceStateSnapshot() {
 	return {
-		players: s$1().get(MODULE_ID, "cheatStatePlayers"),
-		gm: s$1().get(MODULE_ID, "cheatStateGm"),
-		playerOverrides: { ...s$1().get(MODULE_ID, "cheatStatePlayerOverrides") }
+		players: s$1().get(MODULE_ID, "influenceStatePlayers"),
+		gm: s$1().get(MODULE_ID, "influenceStateGm"),
+		playerOverrides: { ...s$1().get(MODULE_ID, "influenceStatePlayerOverrides") }
 	};
 }
-function isCheatState(value) {
+function isInfluenceState(value) {
 	return value === "off" || value === "better" || value === "worse";
 }
 function isPlayerOverrideState(value) {
-	return value === "inherit" || isCheatState(value);
+	return value === "inherit" || isInfluenceState(value);
 }
-function normalizeCheatStateSnapshot(snapshot) {
-	if (!snapshot || !isCheatState(snapshot.players) || !isCheatState(snapshot.gm)) return null;
+function normalizeInfluenceStateSnapshot(snapshot) {
+	if (!snapshot || !isInfluenceState(snapshot.players) || !isInfluenceState(snapshot.gm)) return null;
 	const playerOverrides = {};
 	if (snapshot.playerOverrides && typeof snapshot.playerOverrides === "object") {
 		for (const [userId, state] of Object.entries(snapshot.playerOverrides)) {
@@ -37,29 +37,29 @@ function normalizeCheatStateSnapshot(snapshot) {
 		playerOverrides
 	};
 }
-function applyCheatStateSnapshot(snapshot) {
-	const normalized = normalizeCheatStateSnapshot(snapshot);
-	if (normalized) syncedCheatState = normalized;
+function applyInfluenceStateSnapshot(snapshot) {
+	const normalized = normalizeInfluenceStateSnapshot(snapshot);
+	if (normalized) syncedInfluenceState = normalized;
 }
-function sendCheatStateSnapshot(targetUserId = null) {
-	const snapshot = readCheatStateSnapshot();
-	applyCheatStateSnapshot(snapshot);
+function sendInfluenceStateSnapshot(targetUserId = null) {
+	const snapshot = readInfluenceStateSnapshot();
+	applyInfluenceStateSnapshot(snapshot);
 	game.socket?.emit(SOCKET_NAME, {
-		type: "cheat-state",
+		type: "influence-state",
 		targetUserId,
 		snapshot
 	});
 }
-function broadcastCheatStateSnapshot() {
-	sendCheatStateSnapshot();
+function broadcastInfluenceStateSnapshot() {
+	sendInfluenceStateSnapshot();
 }
-function isAuthorizedCheatStateSender(senderId) {
+function isAuthorizedInfluenceStateSender(senderId) {
 	if (typeof senderId !== "string") return false;
 	const sender = game.users?.get?.(senderId);
 	return Boolean(sender?.isGM && sender.active);
 }
-function initCheatStateSync() {
-	applyCheatStateSnapshot(readCheatStateSnapshot());
+function initInfluenceStateSync() {
+	applyInfluenceStateSnapshot(readInfluenceStateSnapshot());
 	game.socket?.on(SOCKET_NAME, (payload, senderId) => {
 		if (payload?.type === "roll-intent") {
 			applyRemoteRollIntent({ ...payload, userId: senderId ?? payload.userId }, "raw-socket");
@@ -69,32 +69,32 @@ function initCheatStateSync() {
 			applyRemoteRollController({ ...payload, userId: senderId ?? payload.userId }, "raw-socket");
 			return;
 		}
-		if (payload?.type === "request-cheat-state") {
-			if (game.user?.isGM && typeof payload.userId === "string") sendCheatStateSnapshot(payload.userId);
+		if (payload?.type === "request-influence-state") {
+			if (game.user?.isGM && typeof payload.userId === "string") sendInfluenceStateSnapshot(payload.userId);
 			return;
 		}
-		if (payload?.type !== "cheat-state") return;
-		if (!isAuthorizedCheatStateSender(senderId)) return;
+		if (payload?.type !== "influence-state") return;
+		if (!isAuthorizedInfluenceStateSender(senderId)) return;
 		if (payload.targetUserId && payload.targetUserId !== game.user?.id) return;
-		applyCheatStateSnapshot(payload.snapshot);
+		applyInfluenceStateSnapshot(payload.snapshot);
 	});
 	Hooks.on("updateSetting", (setting) => {
 		const key = String(setting?.key ?? "");
-		if (!key.startsWith(`${MODULE_ID}.cheatState`)) return;
-		applyCheatStateSnapshot(readCheatStateSnapshot());
-		if (key === `${MODULE_ID}.cheatStatePlayers`) localState.cheatStatePlayers = s$1().get(MODULE_ID, "cheatStatePlayers");
-		if (key === `${MODULE_ID}.cheatStateGm`) localState.cheatStateGm = s$1().get(MODULE_ID, "cheatStateGm");
-		if (key === `${MODULE_ID}.cheatStatePlayerOverrides`) playerOverrides = { ...s$1().get(MODULE_ID, "cheatStatePlayerOverrides") };
+		if (!key.startsWith(`${MODULE_ID}.influenceState`)) return;
+		applyInfluenceStateSnapshot(readInfluenceStateSnapshot());
+		if (key === `${MODULE_ID}.influenceStatePlayers`) localState.influenceStatePlayers = s$1().get(MODULE_ID, "influenceStatePlayers");
+		if (key === `${MODULE_ID}.influenceStateGm`) localState.influenceStateGm = s$1().get(MODULE_ID, "influenceStateGm");
+		if (key === `${MODULE_ID}.influenceStatePlayerOverrides`) playerOverrides = { ...s$1().get(MODULE_ID, "influenceStatePlayerOverrides") };
 		refreshWidgetControls();
 	});
-	if (game.user?.isGM) broadcastCheatStateSnapshot();
+	if (game.user?.isGM) broadcastInfluenceStateSnapshot();
 	else if (game.user?.id) game.socket?.emit(SOCKET_NAME, {
-		type: "request-cheat-state",
+		type: "request-influence-state",
 		userId: game.user.id
 	});
 }
-function getCheatState(controllerUserId = null) {
-	const snapshot = syncedCheatState ?? readCheatStateSnapshot();
+function getInfluenceState(controllerUserId = null) {
+	const snapshot = syncedInfluenceState ?? readInfluenceStateSnapshot();
 	const userId = controllerUserId ?? game.user?.id ?? null;
 	const controller = userId ? game.users?.get?.(userId) : null;
 	if (controller?.isGM) return snapshot.gm;
@@ -105,23 +105,41 @@ function getCheatState(controllerUserId = null) {
 	}
 	return game.user?.isGM ? snapshot.gm : snapshot.players;
 }
+var LEGACY_SETTING_KEYS = {
+	cheatStrategy: "influenceStrategy",
+	cheatStatePlayers: "influenceStatePlayers",
+	cheatStateGm: "influenceStateGm",
+	cheatStatePlayerOverrides: "influenceStatePlayerOverrides"
+};
+async function migrateLegacySettingKeys() {
+	const activeGm = game.users?.activeGM;
+	if (activeGm ? !activeGm.isSelf : !(game.user?.isGM ?? false)) return;
+	const storage = game.settings?.storage?.get?.("world");
+	if (typeof storage?.getSetting !== "function") return;
+	for (const [legacyKey, key] of Object.entries(LEGACY_SETTING_KEYS)) {
+		const legacy = storage.getSetting(`${MODULE_ID}.${legacyKey}`);
+		if (!legacy) continue;
+		if (!storage.getSetting(`${MODULE_ID}.${key}`)) await s$1().set(MODULE_ID, key, legacy.value);
+		await legacy.delete();
+	}
+}
 async function migratePlayerOverrideState() {
 	if (!(game.user?.isGM ?? false)) return;
 	const schemaVersion = Number(s$1().get(MODULE_ID, "stateSchemaVersion") ?? 0);
 	if (schemaVersion >= 2) return;
-	const saved = s$1().get(MODULE_ID, "cheatStatePlayerOverrides") ?? {};
+	const saved = s$1().get(MODULE_ID, "influenceStatePlayerOverrides") ?? {};
 	const migrated = {};
 	for (const [userId, state] of Object.entries(saved)) {
 		migrated[userId] = state === "off" ? "inherit" : isPlayerOverrideState(state) ? state : "inherit";
 	}
-	await s$1().set(MODULE_ID, "cheatStatePlayerOverrides", migrated);
+	await s$1().set(MODULE_ID, "influenceStatePlayerOverrides", migrated);
 	await s$1().set(MODULE_ID, "stateSchemaVersion", 2);
-	applyCheatStateSnapshot(readCheatStateSnapshot());
+	applyInfluenceStateSnapshot(readInfluenceStateSnapshot());
 }
-function getCheatConfig(controllerUserId = null) {
+function getInfluenceConfig(controllerUserId = null) {
 	return {
-		state: getCheatState(controllerUserId),
-		strategy: s$1().get(MODULE_ID, "cheatStrategy"),
+		state: getInfluenceState(controllerUserId),
+		strategy: s$1().get(MODULE_ID, "influenceStrategy"),
 		thresholdPercent: s$1().get(MODULE_ID, "thresholdPercent"),
 		explicitMode: s$1().get(MODULE_ID, "explicitMode"),
 		debugMode: s$1().get(MODULE_ID, "debugMode")
@@ -452,7 +470,7 @@ function registerRollControllerHooks() {
 function patchDnd5eBuildEvaluate() {
 	const rollClass = CONFIG.Dice?.BasicRoll;
 	const originalBuildEvaluate = rollClass?.buildEvaluate;
-	if (typeof originalBuildEvaluate !== "function" || originalBuildEvaluate._fumbleSwitchCustomPatched) return;
+	if (typeof originalBuildEvaluate !== "function") return;
 	installWrapper(rollClass, "CONFIG.Dice.BasicRoll", "buildEvaluate", async function patchedBuildEvaluate(wrapped, rolls, config = {}, message = {}) {
 		const actor = resolveActorFromRollContext(config, message);
 		const workflow = getWorkflowFromContext(config);

@@ -1,4 +1,4 @@
-var CHEAT_COLORS = {
+var INFLUENCE_COLORS = {
 	better: {
 		colorset: "custom",
 		labelColor: "#ffffff",
@@ -18,8 +18,8 @@ function onDsnRollStart(_messageId, context) {
 	const { roll } = context;
 	if (!roll) return;
 	const opts = roll.options;
-	if (!(opts?.diceMasterInfluenced ?? opts?.fumbleSwitchCheated)) return;
-	const colors = CHEAT_COLORS[opts.diceMasterDirection ?? opts.fumbleSwitchDirection];
+	if (!(opts?.diceMasterInfluenced)) return;
+	const colors = INFLUENCE_COLORS[opts.diceMasterDirection];
 	if (!colors) return;
 	const explicitMode = game.settings.get(MODULE_ID, "explicitMode");
 	const isGm = game.user?.isGM ?? false;

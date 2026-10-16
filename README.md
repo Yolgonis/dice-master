@@ -56,7 +56,7 @@ npm run test:coverage
 
 Testler kullanıcı izolasyonu, eşzamanlı workflow’lar, durum migrasyonu, dört etki stratejisi, advantage/disadvantage seçimi, bias sınırları, socket yetkilendirmesi, HTML kaçışı ve patch idempotence davranışlarını doğrular. Coverage komutu dinamik VM test harness’inde çalıştırılan bundle için V8 fonksiyon kapsamını ölçer ve %80 altını başarısız sayar.
 
-0.7.x geçiş döneminde yeni `diceMaster*` runtime işaretleri asıl adlardır; mevcut makrolar ve entegrasyonlar kırılmasın diye eski `fumbleSwitch*` işaretleri de yazılır ve okunur.
+Runtime işaretleri yalnızca `diceMaster*` adlarını kullanır. 0.8.0 ile eski `fumbleSwitch*` işaretleri ve `FumbleSwitchSettingsMenu` alias'ı kaldırıldı. Eski `cheat*` dünya ayarları ilk açılışta aktif GM tarafından `influence*` anahtarlarına taşınır.
 
 ## Lisans
 

@@ -70,11 +70,11 @@ function repairPendingAdvantageSelection(die) {
 	}
 	return repairedModifier;
 }
-var pendingCheatedRoll = false;
+var pendingInfluencedRoll = false;
 var pendingDebugInfo = [];
-function consumePendingCheatedRoll() {
-	if (!pendingCheatedRoll) return false;
-	pendingCheatedRoll = false;
+function consumePendingInfluencedRoll() {
+	if (!pendingInfluencedRoll) return false;
+	pendingInfluencedRoll = false;
 	return true;
 }
 function consumePendingDebugInfo() {
@@ -108,7 +108,7 @@ function patchRollEvaluate() {
 	installWrapper(foundry.dice.terms.Die.prototype, "foundry.dice.terms.Die.prototype", "roll", async function patchedRoll(wrapped, options) {
 		const result = await wrapped(options);
 		const controllerUserId = dieControllerUserIds.get(this) ?? getLocalControllerUserId();
-		const config = getCheatConfig(controllerUserId);
+		const config = getInfluenceConfig(controllerUserId);
 		const { faces } = this;
 		if (!faces) return result;
 		const dieType = getDieType(faces);
@@ -130,8 +130,6 @@ function patchRollEvaluate() {
 		const debug = applyStrategy(config.strategy, [result], context);
 		this._diceMasterInfluenced = true;
 		this._diceMasterDirection = config.state;
-		this._fumbleSwitchCheated = true;
-		this._fumbleSwitchDirection = config.state;
 		if (config.debugMode) {
 			const info = {
 				dieType,
@@ -147,7 +145,6 @@ function patchRollEvaluate() {
 			};
 			if (!this._diceMasterDebug) this._diceMasterDebug = [];
 			this._diceMasterDebug.push(info);
-			this._fumbleSwitchDebug = this._diceMasterDebug;
 		}
 		return result;
 	});
@@ -163,21 +160,18 @@ function patchRollEvaluate() {
 		const source = rollControllerTraces.get(this) ?? `local-roll:${this.id ?? this._id ?? "anonymous"}`;
 		if (controllerUserId) bindRollController(this, controllerUserId, source);
 		const result = await wrapped(options);
-		const config = getCheatConfig(controllerUserId);
+		const config = getInfluenceConfig(controllerUserId);
 		if (!config.explicitMode && !config.debugMode) return result;
-		if (!result.terms.some((term) => term._diceMasterInfluenced || term._fumbleSwitchCheated)) return result;
+		if (!result.terms.some((term) => term._diceMasterInfluenced)) return result;
 		if (config.explicitMode) {
 			result.options.diceMasterInfluenced = true;
 			result.options.diceMasterDirection = config.state;
-			result.options.fumbleSwitchCheated = true;
-			result.options.fumbleSwitchDirection = config.state;
-			pendingCheatedRoll = true;
+			pendingInfluencedRoll = true;
 		}
 		if (config.debugMode) {
-			const debugInfo = result.terms.flatMap((term) => term._diceMasterDebug ?? term._fumbleSwitchDebug ?? []);
+			const debugInfo = result.terms.flatMap((term) => term._diceMasterDebug ?? []);
 			if (debugInfo.length > 0) {
 				result.options.diceMasterDebug = debugInfo;
-				result.options.fumbleSwitchDebug = debugInfo;
 				pendingDebugInfo.push(...debugInfo);
 			}
 		}

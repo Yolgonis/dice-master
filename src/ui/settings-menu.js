@@ -56,4 +56,3 @@ var DiceMasterSettingsMenu = class extends foundry.appv1.api.FormApplication {
 		await s$3().set(MODULE_ID, "positiveDirectionOverrides", overrides);
 	}
 };
-var FumbleSwitchSettingsMenu = DiceMasterSettingsMenu;

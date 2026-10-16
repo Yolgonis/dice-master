@@ -120,10 +120,10 @@ function createHarness({ random = [0.8, 0.05], withLibWrapper = false } = {}) {
     [Symbol.iterator]() { return this.contents[Symbol.iterator](); }
   };
   const settings = new Map([
-    ["cheatStatePlayers", "off"],
-    ["cheatStateGm", "better"],
-    ["cheatStatePlayerOverrides", { PLAYER: "worse", PLAYER_TWO: "better" }],
-    ["cheatStrategy", "bias"],
+    ["influenceStatePlayers", "off"],
+    ["influenceStateGm", "better"],
+    ["influenceStatePlayerOverrides", { PLAYER: "worse", PLAYER_TWO: "better" }],
+    ["influenceStrategy", "bias"],
     ["thresholdPercent", 25],
     ["explicitMode", false],
     ["debugMode", true],
@@ -229,49 +229,49 @@ function createHarness({ random = [0.8, 0.05], withLibWrapper = false } = {}) {
 
 test("a player cannot replace the synchronized Better/Worse state over the raw socket", async () => {
   const harness = createHarness();
-  await harness.context.game.settings.set("dice-master", "cheatStatePlayers", "off");
-  await harness.context.game.settings.set("dice-master", "cheatStatePlayerOverrides", {});
+  await harness.context.game.settings.set("dice-master", "influenceStatePlayers", "off");
+  await harness.context.game.settings.set("dice-master", "influenceStatePlayerOverrides", {});
   harness.context.game.user = harness.player;
-  harness.context.initCheatStateSync();
+  harness.context.initInfluenceStateSync();
 
   harness.receiveSocket("module.dice-master", {
-    type: "cheat-state",
+    type: "influence-state",
     snapshot: { players: "better", gm: "worse", playerOverrides: {} }
   }, harness.secondPlayer.id);
 
-  assert.equal(harness.context.getCheatState(harness.player.id), "off");
+  assert.equal(harness.context.getInfluenceState(harness.player.id), "off");
 });
 
 test("a snapshot without an authenticated sender is rejected even if its payload claims to be GM", async () => {
   const harness = createHarness();
-  await harness.context.game.settings.set("dice-master", "cheatStatePlayers", "off");
-  await harness.context.game.settings.set("dice-master", "cheatStatePlayerOverrides", {});
+  await harness.context.game.settings.set("dice-master", "influenceStatePlayers", "off");
+  await harness.context.game.settings.set("dice-master", "influenceStatePlayerOverrides", {});
   harness.context.game.user = harness.player;
-  harness.context.initCheatStateSync();
+  harness.context.initInfluenceStateSync();
 
   harness.receiveSocket("module.dice-master", {
-    type: "cheat-state",
+    type: "influence-state",
     userId: harness.gm.id,
     snapshot: { players: "better", gm: "worse", playerOverrides: {} }
   });
 
-  assert.equal(harness.context.getCheatState(harness.player.id), "off");
+  assert.equal(harness.context.getInfluenceState(harness.player.id), "off");
 });
 
 test("an active GM can publish a valid synchronized Better/Worse state", async () => {
   const harness = createHarness();
-  await harness.context.game.settings.set("dice-master", "cheatStatePlayers", "off");
-  await harness.context.game.settings.set("dice-master", "cheatStatePlayerOverrides", {});
+  await harness.context.game.settings.set("dice-master", "influenceStatePlayers", "off");
+  await harness.context.game.settings.set("dice-master", "influenceStatePlayerOverrides", {});
   harness.context.game.user = harness.player;
-  harness.context.initCheatStateSync();
+  harness.context.initInfluenceStateSync();
 
   harness.receiveSocket("module.dice-master", {
-    type: "cheat-state",
+    type: "influence-state",
     targetUserId: harness.player.id,
     snapshot: { players: "better", gm: "worse", playerOverrides: {} }
   }, harness.gm.id);
 
-  assert.equal(harness.context.getCheatState(harness.player.id), "better");
+  assert.equal(harness.context.getInfluenceState(harness.player.id), "better");
 });
 
 test("debug chat markup escapes user-controlled controller and trace text", () => {
@@ -296,7 +296,7 @@ test("debug chat markup escapes user-controlled controller and trace text", () =
 
 test("installing the roll patches twice does not influence one die twice", async () => {
   const harness = createHarness();
-  await harness.context.game.settings.set("dice-master", "cheatStrategy", "nudge");
+  await harness.context.game.settings.set("dice-master", "influenceStrategy", "nudge");
   await harness.context.game.settings.set("dice-master", "nudgeValues", { d20: 4 });
   harness.context.game.user = harness.gm;
 
@@ -305,12 +305,12 @@ test("installing the roll patches twice does not influence one die twice", async
   await new harness.MockRoll([die]).evaluate();
 
   assert.equal(die.results[0].result, 14);
-  assert.equal(die._fumbleSwitchDebug.length, 1);
+  assert.equal(die._diceMasterDebug.length, 1);
 });
 
 test("with libWrapper active every roll patch is registered once as a WRAPPER and still influences dice", async () => {
   const harness = createHarness({ withLibWrapper: true });
-  await harness.context.game.settings.set("dice-master", "cheatStrategy", "nudge");
+  await harness.context.game.settings.set("dice-master", "influenceStrategy", "nudge");
   await harness.context.game.settings.set("dice-master", "nudgeValues", { d20: 4 });
   harness.context.game.user = harness.gm;
 
@@ -379,7 +379,7 @@ test("pending advantage and disadvantage groups keep the correct result set", ()
 
 test("the dice settings menu normalizes submitted values and stores per-die overrides", async () => {
   const harness = createHarness();
-  const menu = new harness.context.FumbleSwitchSettingsMenu();
+  const menu = new harness.context.DiceMasterSettingsMenu();
   const initial = menu.getData();
   assert.equal(initial.dice.length, 7);
   assert.equal(initial.globalDirection, "higher");
@@ -411,14 +411,14 @@ test("an authorized remote controller is captured and Dice So Nice receives the 
 
   harness.context.game.modules.get = id => ({ active: id === "dice-so-nice" });
   harness.context.initDiceSoNice();
-  const roll = { options: { fumbleSwitchCheated: true, fumbleSwitchDirection: "better" } };
+  const roll = { options: { diceMasterInfluenced: true, diceMasterDirection: "better" } };
   harness.Hooks.callAll("diceSoNiceRollStart", "message", { roll });
   assert.equal(roll.options.appearance.diceColor, "#27ae60");
 });
 
-test("Dice Master writes canonical runtime flags while preserving legacy flag compatibility", async () => {
+test("Dice Master writes only canonical runtime flags", async () => {
   const harness = createHarness();
-  await harness.context.game.settings.set("dice-master", "cheatStrategy", "full");
+  await harness.context.game.settings.set("dice-master", "influenceStrategy", "full");
   harness.context.game.user = harness.gm;
   const die = new harness.MockDie({ faces: 20, originals: [8] });
   const roll = new harness.MockRoll([die]);
@@ -427,11 +427,14 @@ test("Dice Master writes canonical runtime flags while preserving legacy flag co
 
   assert.equal(die._diceMasterInfluenced, true);
   assert.equal(die._diceMasterDirection, "better");
-  assert.deepEqual(die._diceMasterDebug, die._fumbleSwitchDebug);
-  assert.deepEqual(roll.options.diceMasterDebug, roll.options.fumbleSwitchDebug);
+  assert.equal(die._diceMasterDebug.length, 1);
+  assert.equal(JSON.stringify(roll.options.diceMasterDebug), JSON.stringify(die._diceMasterDebug));
+  for ( const target of [die, roll.options] ) {
+    assert.deepEqual(Object.keys(target).filter(key => /fumbleSwitch/i.test(key)), []);
+  }
 });
 
-test("Dice So Nice accepts canonical Dice Master flags without legacy flags", () => {
+test("Dice So Nice uses canonical Dice Master flags and ignores legacy Fumble Switch flags", () => {
   const harness = createHarness();
   harness.context.game.modules.get = id => ({ active: id === "dice-so-nice" });
   harness.context.initDiceSoNice();
@@ -440,23 +443,27 @@ test("Dice So Nice accepts canonical Dice Master flags without legacy flags", ()
   harness.Hooks.callAll("diceSoNiceRollStart", "message", { roll });
 
   assert.equal(roll.options.appearance.diceColor, "#c0392b");
+
+  const legacyRoll = { options: { fumbleSwitchCheated: true, fumbleSwitchDirection: "worse" } };
+  harness.Hooks.callAll("diceSoNiceRollStart", "message", { roll: legacyRoll });
+  assert.equal(legacyRoll.options.appearance, undefined);
 });
 
-test("the settings application uses the Dice Master class name and keeps the legacy alias", () => {
+test("the settings application uses the Dice Master class name without the legacy alias", () => {
   const harness = createHarness();
   assert.equal(typeof harness.context.DiceMasterSettingsMenu, "function");
-  assert.equal(harness.context.FumbleSwitchSettingsMenu, harness.context.DiceMasterSettingsMenu);
+  assert.equal(typeof harness.context.FumbleSwitchSettingsMenu, "undefined");
 });
 
 test("settings metadata, controller resolution, and widget state helpers expose stable values", () => {
   const harness = createHarness();
-  const options = harness.context.FumbleSwitchSettingsMenu.defaultOptions;
+  const options = harness.context.DiceMasterSettingsMenu.defaultOptions;
   assert.equal(options.id, "dice-master-settings-menu");
   assert.equal(harness.context.getUsersArray().length, 3);
   assert.equal(harness.context.resolveActorControllerUserId(harness.actor), harness.player.id);
 
-  harness.context.localState.cheatStatePlayers = "better";
-  harness.context.localState.cheatStateGm = "off";
+  harness.context.localState.influenceStatePlayers = "better";
+  harness.context.localState.influenceStateGm = "off";
   harness.context.playerOverrides = { [harness.secondPlayer.id]: "worse" };
   assert.equal(harness.context.hasActiveOverride(), true);
   assert.equal(harness.context.getWidgetStateClass(), "dice-master--better");
@@ -535,8 +542,8 @@ test("widget state refresh, visibility toggle, override save, and player removal
   };
   harness.context.widget = { isConnected: true, hidden: false, className: "" };
   harness.context.playersContainer = { appendChild() {} };
-  harness.context.localState.cheatStatePlayers = "better";
-  harness.context.localState.cheatStateGm = "off";
+  harness.context.localState.influenceStatePlayers = "better";
+  harness.context.localState.influenceStateGm = "off";
   harness.context.playerOverrides = { [harness.player.id]: "worse" };
   harness.context.playerRows.set(harness.player.id, row);
 
@@ -549,7 +556,7 @@ test("widget state refresh, visibility toggle, override save, and player removal
   harness.context.toggleWidget();
   assert.equal(harness.context.widget.hidden, true);
   await harness.context.savePlayerOverrides();
-  assert.equal(harness.context.game.settings.get("dice-master", "cheatStatePlayerOverrides").PLAYER, "worse");
+  assert.equal(harness.context.game.settings.get("dice-master", "influenceStatePlayerOverrides").PLAYER, "worse");
 
   harness.context.removePlayerFromWidget(harness.player.id);
   assert.equal(removed, true);
@@ -558,7 +565,7 @@ test("widget state refresh, visibility toggle, override save, and player removal
 
 test("local GM and player rolls always use their own independent states", async () => {
   const harness = createHarness();
-  await harness.context.game.settings.set("dice-master", "cheatStrategy", "full");
+  await harness.context.game.settings.set("dice-master", "influenceStrategy", "full");
 
   const gmDie = new harness.MockDie({ faces: 20, originals: [8] });
   await new harness.MockRoll([gmDie]).evaluate();
@@ -569,18 +576,18 @@ test("local GM and player rolls always use their own independent states", async 
   const firstPlayerRoll = new harness.MockRoll([firstPlayerDie]);
   await firstPlayerRoll.evaluate();
   assert.equal(firstPlayerDie.results[0].result, 1);
-  assert.equal(firstPlayerRoll.options.fumbleSwitchDebug[0].controller, "Ahmetennes");
+  assert.equal(firstPlayerRoll.options.diceMasterDebug[0].controller, "Ahmetennes");
   harness.context.game.user = harness.secondPlayer;
   const secondPlayerDie = new harness.MockDie({ faces: 20, originals: [8] });
   const secondPlayerRoll = new harness.MockRoll([secondPlayerDie]);
   await secondPlayerRoll.evaluate();
   assert.equal(secondPlayerDie.results[0].result, 20);
-  assert.equal(secondPlayerRoll.options.fumbleSwitchDebug[0].controller, "Second Player");
+  assert.equal(secondPlayerRoll.options.diceMasterDebug[0].controller, "Second Player");
 });
 
 test("a player activity keeps its controller across attack and damage without affecting GM rolls", async () => {
   const harness = createHarness();
-  await harness.context.game.settings.set("dice-master", "cheatStrategy", "full");
+  await harness.context.game.settings.set("dice-master", "influenceStrategy", "full");
   const workflow = { id: "WF_PLAYER", itemCardId: "CARD_PLAYER", actor: harness.actor };
 
   harness.Hooks.callAll("createChatMessage", {
@@ -596,7 +603,7 @@ test("a player activity keeps its controller across attack and damage without af
   const attackRoll = new harness.MockBasicRoll([attackDie]);
   await harness.MockBasicRoll.buildEvaluate([attackRoll], { workflow, subject: { actor: harness.actor } }, {});
   assert.equal(attackDie.results[0].result, 1);
-  assert.equal(attackRoll.options.fumbleSwitchDebug[0].controller, "Ahmetennes");
+  assert.equal(attackRoll.options.diceMasterDebug[0].controller, "Ahmetennes");
 
   harness.context.applyRemoteRollIntent({ userId: "PLAYER_TWO", action: "other-player", intentId: "intent-two" }, "test");
   harness.Hooks.callAll("midi-qol.preDamageRoll", workflow);
@@ -604,18 +611,18 @@ test("a player activity keeps its controller across attack and damage without af
   const damageRoll = new harness.MockBasicRoll([damageDie]);
   await harness.MockBasicRoll.buildEvaluate([damageRoll], { workflow, subject: { actor: harness.actor } }, {});
   assert.equal(damageDie.results[0].result, 1);
-  assert.equal(damageRoll.options.fumbleSwitchDebug[0].controller, "Ahmetennes");
+  assert.equal(damageRoll.options.diceMasterDebug[0].controller, "Ahmetennes");
 
   const gmDie = new harness.MockDie({ faces: 20, originals: [4] });
   const gmRoll = new harness.MockRoll([gmDie]);
   await gmRoll.evaluate();
   assert.equal(gmDie.results[0].result, 20);
-  assert.equal(gmRoll.options.fumbleSwitchDebug[0].controller, "Gamemaster");
+  assert.equal(gmRoll.options.diceMasterDebug[0].controller, "Gamemaster");
 });
 
 test("simultaneous workflows from two players cannot override one another", async () => {
   const harness = createHarness();
-  await harness.context.game.settings.set("dice-master", "cheatStrategy", "full");
+  await harness.context.game.settings.set("dice-master", "influenceStrategy", "full");
   const firstWorkflow = { id: "WF_ONE", actor: harness.actor };
   const secondWorkflow = { id: "WF_TWO", actor: harness.secondActor };
 
@@ -634,14 +641,14 @@ test("simultaneous workflows from two players cannot override one another", asyn
   ]);
 
   assert.equal(firstDie.results[0].result, 1);
-  assert.equal(firstRoll.options.fumbleSwitchDebug[0].controller, "Ahmetennes");
+  assert.equal(firstRoll.options.diceMasterDebug[0].controller, "Ahmetennes");
   assert.equal(secondDie.results[0].result, 20);
-  assert.equal(secondRoll.options.fumbleSwitchDebug[0].controller, "Second Player");
+  assert.equal(secondRoll.options.diceMasterDebug[0].controller, "Second Player");
 });
 
 test("explicit message author wins over actor ownership and duplicate intents are ignored", async () => {
   const harness = createHarness();
-  await harness.context.game.settings.set("dice-master", "cheatStrategy", "full");
+  await harness.context.game.settings.set("dice-master", "influenceStrategy", "full");
 
   harness.context.applyRemoteRollIntent({ userId: "PLAYER", action: "roll", intentId: "duplicate" }, "raw");
   harness.context.applyRemoteRollIntent({ userId: "PLAYER_TWO", action: "roll", intentId: "duplicate" }, "socketlib");
@@ -655,42 +662,83 @@ test("explicit message author wins over actor ownership and duplicate intents ar
   const gmRoll = new harness.MockBasicRoll([gmDie]);
   await harness.MockBasicRoll.buildEvaluate([gmRoll], { subject: { actor: harness.actor } }, { author: harness.gm });
   assert.equal(gmDie.results[0].result, 20);
-  assert.equal(gmRoll.options.fumbleSwitchDebug[0].controller, "Gamemaster");
+  assert.equal(gmRoll.options.diceMasterDebug[0].controller, "Gamemaster");
+});
+
+test("legacy cheat* world settings move to influence* keys and are removed", async () => {
+  const harness = createHarness();
+  const stored = new Map([
+    ["dice-master.cheatStrategy", "nudge"],
+    ["dice-master.cheatStatePlayers", "worse"],
+    ["dice-master.cheatStatePlayerOverrides", { PLAYER: "better" }],
+    ["dice-master.influenceStateGm", "off"],
+    ["dice-master.cheatStateGm", "better"]
+  ]);
+  harness.context.game.settings.storage = new Map([["world", {
+    getSetting(key) {
+      if (!stored.has(key)) return undefined;
+      return { value: stored.get(key), async delete() { stored.delete(key); } };
+    }
+  }]]);
+  harness.context.game.user = harness.gm;
+  await harness.context.game.settings.set("dice-master", "influenceStateGm", "off");
+
+  await harness.context.migrateLegacySettingKeys();
+
+  assert.equal(harness.context.game.settings.get("dice-master", "influenceStrategy"), "nudge");
+  assert.equal(harness.context.game.settings.get("dice-master", "influenceStatePlayers"), "worse");
+  assert.deepEqual({ ...harness.context.game.settings.get("dice-master", "influenceStatePlayerOverrides") }, { PLAYER: "better" });
+  assert.equal(harness.context.game.settings.get("dice-master", "influenceStateGm"), "off", "an existing new key wins over the legacy value");
+  assert.deepEqual([...stored.keys()].filter(key => key.includes(".cheat")), []);
+});
+
+test("legacy cheat* settings are left alone for players", async () => {
+  const harness = createHarness();
+  let deleted = false;
+  harness.context.game.settings.storage = new Map([["world", {
+    getSetting(key) { return key === "dice-master.cheatStrategy" ? { value: "full", async delete() { deleted = true; } } : undefined; }
+  }]]);
+  harness.context.game.user = harness.player;
+
+  await harness.context.migrateLegacySettingKeys();
+
+  assert.equal(harness.context.game.settings.get("dice-master", "influenceStrategy"), "bias");
+  assert.equal(deleted, false);
 });
 
 test("legacy player Off overrides migrate to Inherit without changing behavior", async () => {
   const harness = createHarness();
-  await harness.context.game.settings.set("dice-master", "cheatStatePlayers", "better");
-  await harness.context.game.settings.set("dice-master", "cheatStatePlayerOverrides", { PLAYER: "off", PLAYER_TWO: "worse" });
+  await harness.context.game.settings.set("dice-master", "influenceStatePlayers", "better");
+  await harness.context.game.settings.set("dice-master", "influenceStatePlayerOverrides", { PLAYER: "off", PLAYER_TWO: "worse" });
   await harness.context.game.settings.set("dice-master", "stateSchemaVersion", 0);
 
   await harness.context.migratePlayerOverrideState();
-  const migrated = harness.context.game.settings.get("dice-master", "cheatStatePlayerOverrides");
+  const migrated = harness.context.game.settings.get("dice-master", "influenceStatePlayerOverrides");
   assert.equal(migrated.PLAYER, "inherit");
   assert.equal(migrated.PLAYER_TWO, "worse");
   assert.equal(harness.context.game.settings.get("dice-master", "stateSchemaVersion"), 2);
-  assert.equal(harness.context.getCheatState("PLAYER"), "better");
-  assert.equal(harness.context.getCheatState("PLAYER_TWO"), "worse");
+  assert.equal(harness.context.getInfluenceState("PLAYER"), "better");
+  assert.equal(harness.context.getInfluenceState("PLAYER_TWO"), "worse");
 });
 
 test("Inherit, explicit Off, and presets resolve to distinct effective states", async () => {
   const harness = createHarness();
-  await harness.context.game.settings.set("dice-master", "cheatStatePlayers", "better");
-  await harness.context.game.settings.set("dice-master", "cheatStatePlayerOverrides", { PLAYER: "inherit", PLAYER_TWO: "off" });
-  harness.context.applyCheatStateSnapshot(harness.context.readCheatStateSnapshot());
+  await harness.context.game.settings.set("dice-master", "influenceStatePlayers", "better");
+  await harness.context.game.settings.set("dice-master", "influenceStatePlayerOverrides", { PLAYER: "inherit", PLAYER_TWO: "off" });
+  harness.context.applyInfluenceStateSnapshot(harness.context.readInfluenceStateSnapshot());
 
-  assert.equal(harness.context.getCheatState("PLAYER"), "better");
-  assert.equal(harness.context.getCheatState("PLAYER_TWO"), "off");
+  assert.equal(harness.context.getInfluenceState("PLAYER"), "better");
+  assert.equal(harness.context.getInfluenceState("PLAYER_TWO"), "off");
 
   await harness.context.applyPreset("hardMode");
-  assert.equal(harness.context.game.settings.get("dice-master", "cheatStatePlayers"), "worse");
-  assert.equal(harness.context.game.settings.get("dice-master", "cheatStateGm"), "better");
-  assert.deepEqual(Object.keys(harness.context.game.settings.get("dice-master", "cheatStatePlayerOverrides")), []);
+  assert.equal(harness.context.game.settings.get("dice-master", "influenceStatePlayers"), "worse");
+  assert.equal(harness.context.game.settings.get("dice-master", "influenceStateGm"), "better");
+  assert.deepEqual(Object.keys(harness.context.game.settings.get("dice-master", "influenceStatePlayerOverrides")), []);
 });
 
 test("Bias Better and Worse limits enforce the configured d20 floor and ceiling", async () => {
   const harness = createHarness({ random: [0.8, 0.3, 0.3, 0.3] });
-  await harness.context.game.settings.set("dice-master", "cheatStrategy", "bias");
+  await harness.context.game.settings.set("dice-master", "influenceStrategy", "bias");
   await harness.context.game.settings.set("dice-master", "biasBetterLimits", { d20: 10 });
   await harness.context.game.settings.set("dice-master", "biasWorseLimits", { d20: 10 });
 
@@ -703,7 +751,7 @@ test("Bias Better and Worse limits enforce the configured d20 floor and ceiling"
   await secondWorseRoll.evaluate();
   assert.equal(worseAboveLimit.results[0].result, 10);
   assert.equal(worseBelowLimit.results[0].result, 7);
-  assert.equal(firstWorseRoll.options.fumbleSwitchDebug[0].biasLimit, 10);
+  assert.equal(firstWorseRoll.options.diceMasterDebug[0].biasLimit, 10);
 
   harness.context.game.user = harness.secondPlayer;
   const betterBelowLimit = new harness.MockDie({ faces: 20, originals: [4] });
@@ -716,7 +764,7 @@ test("Bias Better and Worse limits enforce the configured d20 floor and ceiling"
 
 test("Bias limits follow semantic Better and Worse when lower rolls are favorable", async () => {
   const harness = createHarness({ random: [0.8, 0.3] });
-  await harness.context.game.settings.set("dice-master", "cheatStrategy", "bias");
+  await harness.context.game.settings.set("dice-master", "influenceStrategy", "bias");
   await harness.context.game.settings.set("dice-master", "positiveDirection", "lower");
   await harness.context.game.settings.set("dice-master", "biasBetterLimits", { d20: 10 });
   await harness.context.game.settings.set("dice-master", "biasWorseLimits", { d20: 10 });

@@ -40,10 +40,11 @@ Hooks.once("init", () => {
 	});
 });
 Hooks.once("ready", async () => {
+	await migrateLegacySettingKeys();
 	await migratePlayerOverrideState();
 	patchDnd5eBuildEvaluate();
 	initSocketlibIntegration();
-	initCheatStateSync();
+	initInfluenceStateSync();
 	initSocketActivityCapture();
 	initRollIntentRelay();
 	initDiceSoNice();
@@ -54,9 +55,9 @@ Hooks.on("createChatMessage", (message) => {
 	const explicitMode = game.settings.get(MODULE_ID, "explicitMode");
 	const debugMode = game.settings.get(MODULE_ID, "debugMode");
 	if (!explicitMode && !debugMode) return;
-	const hasRollFlag = message.rolls?.some((r) => r.options?.diceMasterInfluenced ?? r.options?.fumbleSwitchCheated);
-	const hasPendingFlag = consumePendingCheatedRoll();
-	const rollDebug = message.rolls?.flatMap((r) => r.options?.diceMasterDebug ?? r.options?.fumbleSwitchDebug ?? []) ?? [];
+	const hasRollFlag = message.rolls?.some((r) => r.options?.diceMasterInfluenced);
+	const hasPendingFlag = consumePendingInfluencedRoll();
+	const rollDebug = message.rolls?.flatMap((r) => r.options?.diceMasterDebug ?? []) ?? [];
 	const pendingDebug = consumePendingDebugInfo();
 	const debugInfo = rollDebug.length > 0 ? rollDebug : pendingDebug;
 	if (!(hasRollFlag || hasPendingFlag || debugInfo.length > 0)) return;
