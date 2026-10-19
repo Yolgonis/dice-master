@@ -779,3 +779,71 @@ test("Bias limits follow semantic Better and Worse when lower rolls are favorabl
   await new harness.MockRoll([worseDie]).evaluate();
   assert.equal(worseDie.results[0].result, 10);
 });
+
+async function badLuckHarness(random = [0.8]) {
+  const harness = createHarness({ random });
+  const settings = harness.context.game.settings;
+  await settings.set("dice-master", "influenceStatePlayers", "off");
+  await settings.set("dice-master", "influenceStatePlayerOverrides", {});
+  await settings.set("dice-master", "badLuckEnabled", true);
+  await settings.set("dice-master", "badLuckThreshold", 5);
+  await settings.set("dice-master", "badLuckStreak", 3);
+  await settings.set("dice-master", "affectedDice", { d20: true });
+  harness.context.applyInfluenceStateSnapshot(harness.context.readInfluenceStateSnapshot());
+  harness.context.game.user = harness.player;
+  harness.context.patchRollEvaluate();
+  const roll = async (natural, modifiers = []) => {
+    const die = new harness.MockDie({ faces: 20, number: natural.length ?? 1, originals: [].concat(natural), modifiers });
+    await new harness.MockRoll([die]).evaluate();
+    return die;
+  };
+  return { harness, roll, entry: () => harness.context.badLuckStreaks.get(harness.player.id) };
+}
+
+test("three bad d20s in a row make the next d20 roll twice and keep the higher result, once", async () => {
+  const { roll, entry } = await badLuckHarness([0.8]);
+  for ( const natural of [2, 5, 1] ) assert.equal((await roll(natural)).results[0].result, natural);
+  assert.equal(entry().pending, true);
+
+  const protectedDie = await roll(4);
+  assert.equal(protectedDie.results[0].result, 17);
+  assert.equal(protectedDie._diceMasterBadLuck, true);
+  assert.deepEqual({ ...entry() }, { streak: 0, pending: false });
+
+  assert.equal((await roll(3)).results[0].result, 3, "protection is consumed after one roll");
+});
+
+test("a d20 above the threshold resets the bad luck streak", async () => {
+  const { roll, entry } = await badLuckHarness();
+  await roll(2);
+  await roll(3);
+  await roll(12);
+  assert.deepEqual({ ...entry() }, { streak: 0, pending: false });
+});
+
+test("bad luck counts the kept d20 of an advantage roll", async () => {
+  const { roll, entry } = await badLuckHarness();
+  await roll([2, 15], ["adv"]);
+  assert.equal(entry()?.streak ?? 0, 0);
+  await roll([2, 4], ["adv"]);
+  assert.equal(entry().streak, 1);
+});
+
+test("bad luck protection ignores the GM, players with Better/Worse, and the disabled setting", async () => {
+  const gmCase = await badLuckHarness();
+  gmCase.harness.context.game.user = gmCase.harness.gm;
+  for ( const natural of [1, 1, 1, 1] ) await gmCase.roll(natural);
+  assert.equal(gmCase.harness.context.badLuckStreaks.has(gmCase.harness.gm.id), false);
+
+  const worseCase = await badLuckHarness();
+  await worseCase.harness.context.game.settings.set("dice-master", "influenceStatePlayerOverrides", { PLAYER: "worse" });
+  worseCase.harness.context.applyInfluenceStateSnapshot(worseCase.harness.context.readInfluenceStateSnapshot());
+  for ( const natural of [1, 1, 1] ) await worseCase.roll(natural);
+  assert.equal(worseCase.entry(), undefined);
+
+  const disabledCase = await badLuckHarness();
+  await disabledCase.harness.context.game.settings.set("dice-master", "badLuckEnabled", false);
+  for ( const natural of [1, 1, 1] ) await disabledCase.roll(natural);
+  assert.equal((await disabledCase.roll(4)).results[0].result, 4);
+  assert.equal(disabledCase.entry(), undefined);
+});

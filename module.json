@@ -2,7 +2,7 @@
   "id": "dice-master",
   "title": "Dice Master",
   "description": "GM-controlled per-user dice influence with isolated roll workflows, configurable strategies, and Better/Worse bias limits.",
-  "version": "0.8.0",
+  "version": "0.9.0",
   "readme": "README.md",
   "changelog": "CHANGELOG.md",
   "socket": true,

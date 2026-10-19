@@ -1,6 +1,6 @@
 //#region src/constants.ts
 var MODULE_ID = "dice-master";
-var MODULE_VERSION = "0.8.0";
+var MODULE_VERSION = "0.9.0";
 var SOCKET_NAME = `module.${MODULE_ID}`;
 var socketlibModule = null;
 var DIE_TYPES = [
@@ -157,6 +157,40 @@ function registerSettings() {
 		config: true,
 		type: Boolean,
 		default: false
+	});
+	s$2().register(MODULE_ID, "badLuckEnabled", {
+		name: "DICE_MASTER.settings.badLuckEnabled.name",
+		hint: "DICE_MASTER.settings.badLuckEnabled.hint",
+		scope: "world",
+		config: true,
+		type: Boolean,
+		default: false
+	});
+	s$2().register(MODULE_ID, "badLuckThreshold", {
+		name: "DICE_MASTER.settings.badLuckThreshold.name",
+		hint: "DICE_MASTER.settings.badLuckThreshold.hint",
+		scope: "world",
+		config: true,
+		type: Number,
+		default: 5,
+		range: {
+			min: 1,
+			max: 10,
+			step: 1
+		}
+	});
+	s$2().register(MODULE_ID, "badLuckStreak", {
+		name: "DICE_MASTER.settings.badLuckStreak.name",
+		hint: "DICE_MASTER.settings.badLuckStreak.hint",
+		scope: "world",
+		config: true,
+		type: Number,
+		default: 3,
+		range: {
+			min: 2,
+			max: 6,
+			step: 1
+		}
 	});
 	s$2().registerMenu(MODULE_ID, "diceSettingsMenu", {
 		name: "DICE_MASTER.settings.diceSettingsMenu.name",
@@ -819,6 +853,59 @@ function applyStrategy(strategy, results, context) {
 	}
 }
 //#endregion
+//#region src/influence/bad-luck.ts
+/**
+ * Kötü şans koruması: bir oyuncu art arda belirli sayıda kötü d20 atarsa
+ * (doğal sonuç eşiğe eşit ya da altında) sonraki d20 zarı bir kez Bias ile atılır:
+ * ikinci bir d20 atılır, yüksek olan tutulur. Yalnızca oyuncular için ve yalnızca
+ * etkin durum Off iken çalışır; GM'in verdiği Better/Worse her zaman önceliklidir.
+ * Seri, zarı değerlendiren istemcinin belleğinde tutulur (sayfa yenilenince sıfırlanır).
+ */
+var badLuckStreaks = /* @__PURE__ */ new Map();
+function getBadLuckConfig() {
+	return {
+		enabled: Boolean(s$1().get(MODULE_ID, "badLuckEnabled")),
+		threshold: Number(s$1().get(MODULE_ID, "badLuckThreshold") ?? 5),
+		streak: Number(s$1().get(MODULE_ID, "badLuckStreak") ?? 3)
+	};
+}
+function getBadLuckEntry(userId) {
+	let entry = badLuckStreaks.get(userId);
+	if (!entry) {
+		entry = { streak: 0, pending: false };
+		badLuckStreaks.set(userId, entry);
+	}
+	return entry;
+}
+function isBadLuckCandidate(controllerUserId, state) {
+	if (state !== "off" || typeof controllerUserId !== "string") return false;
+	if (!getBadLuckConfig().enabled) return false;
+	const user = game.users?.get?.(controllerUserId);
+	return Boolean(user && !user.isGM);
+}
+function isBadLuckProtectionPending(controllerUserId, state) {
+	return isBadLuckCandidate(controllerUserId, state) && getBadLuckEntry(controllerUserId).pending;
+}
+/** Roll değerlendirildikten sonra seriyi günceller; korunan bir zar seriyi ve korumayı sıfırlar. */
+function recordBadLuckRoll(roll, controllerUserId, state) {
+	if (!isBadLuckCandidate(controllerUserId, state)) return;
+	const d20Terms = (roll.terms ?? []).filter((term) => term?.faces === 20 && Array.isArray(term.results));
+	if (d20Terms.length === 0) return;
+	const entry = getBadLuckEntry(controllerUserId);
+	if (d20Terms.some((term) => term._diceMasterBadLuck)) {
+		entry.streak = 0;
+		entry.pending = false;
+		return;
+	}
+	const kept = d20Terms.flatMap((term) => term.results.filter((r) => r.active !== false).map((r) => r.result));
+	if (kept.length === 0) return;
+	const { threshold, streak } = getBadLuckConfig();
+	if (Math.max(...kept) <= threshold) {
+		entry.streak += 1;
+		if (entry.streak >= streak) entry.pending = true;
+	} else entry.streak = 0;
+}
+//#endregion
 //#region src/influence/patch.ts
 function getDieType(faces) {
 	const key = `d${faces}`;
@@ -936,7 +1023,30 @@ function patchRollEvaluate() {
 		const dieType = getDieType(faces);
 		if (!dieType || !isDieAffected(dieType)) return result;
 		const originalResult = result.result;
-		if (config.state === "off") return result;
+		if (config.state === "off") {
+			if (dieType !== "d20" || !isBadLuckProtectionPending(controllerUserId, config.state)) return result;
+			const badLuckDirection = resolveDirection("better", getPositiveDirection(dieType));
+			const debug = applyBias([result], { state: "better", direction: badLuckDirection, faces, biasBetterLimit: 0, biasWorseLimit: 0 });
+			this._diceMasterBadLuck = true;
+			this._diceMasterInfluenced = true;
+			this._diceMasterDirection = "better";
+			if (config.debugMode) {
+				if (!this._diceMasterDebug) this._diceMasterDebug = [];
+				this._diceMasterDebug.push({
+					dieType,
+					faces,
+					strategy: "badLuck",
+					state: "better",
+					controller: getControllerLabel(controllerUserId),
+					controllerTrace: dieControllerTraces.get(this) ?? `local-die->${controllerUserId ?? "unknown"}`,
+					direction: badLuckDirection,
+					originalResult,
+					finalResult: result.result,
+					...debug
+				});
+			}
+			return result;
+		}
 		const positiveDirection = getPositiveDirection(dieType);
 		const direction = resolveDirection(config.state, positiveDirection);
 		if (!direction) return result;
@@ -983,11 +1093,12 @@ function patchRollEvaluate() {
 		if (controllerUserId) bindRollController(this, controllerUserId, source);
 		const result = await wrapped(options);
 		const config = getInfluenceConfig(controllerUserId);
+		recordBadLuckRoll(result, controllerUserId, config.state);
 		if (!config.explicitMode && !config.debugMode) return result;
 		if (!result.terms.some((term) => term._diceMasterInfluenced)) return result;
 		if (config.explicitMode) {
 			result.options.diceMasterInfluenced = true;
-			result.options.diceMasterDirection = config.state;
+			result.options.diceMasterDirection = result.terms.some((term) => term._diceMasterBadLuck) ? "better" : config.state;
 			pendingInfluencedRoll = true;
 		}
 		if (config.debugMode) {
@@ -1390,6 +1501,10 @@ function formatModifier(info) {
 				direction: game.i18n.localize(`DICE_MASTER.debug.direction.${numericDirection}`)
 			});
 		}
+		case "badLuck": return t("DICE_MASTER.debug.modifier.badLuck", {
+			second: String(info.biasSecondRoll ?? "?"),
+			controller: String(info.controller ?? "?")
+		});
 		case "nudge": return t("DICE_MASTER.debug.modifier.nudge", { delta: formatSigned(info.nudgeDelta ?? 0) });
 		case "threshold":
 			if (!info.thresholdTriggered) return t("DICE_MASTER.debug.modifier.thresholdSkipped", { threshold: String(info.thresholdValue ?? "?") });

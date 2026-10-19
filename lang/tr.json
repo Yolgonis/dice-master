@@ -57,5 +57,12 @@
   "DICE_MASTER.debug.direction.lower": "düşük",
   "DICE_MASTER.debug.modifier.nudge": "kaydırma {delta}",
   "DICE_MASTER.debug.modifier.threshold": "eşik {threshold} → tekrar atıldı: {reroll}",
-  "DICE_MASTER.debug.modifier.thresholdSkipped": "eşik {threshold} → tetiklenmedi"
+  "DICE_MASTER.debug.modifier.thresholdSkipped": "eşik {threshold} → tetiklenmedi",
+  "DICE_MASTER.settings.badLuckEnabled.name": "Kötü Şans Koruması",
+  "DICE_MASTER.settings.badLuckEnabled.hint": "Durumu Off olan bir oyuncu art arda kötü d20 atarsa sonraki d20 zarı iki kez atılır ve yüksek olan tutulur. GM'in verdiği Better/Worse her zaman önceliklidir.",
+  "DICE_MASTER.settings.badLuckThreshold.name": "Kötü Şans: Kötü d20 Eşiği",
+  "DICE_MASTER.settings.badLuckThreshold.hint": "Doğal d20 sonucu bu değere eşit ya da altındaysa kötü zar sayılır.",
+  "DICE_MASTER.settings.badLuckStreak.name": "Kötü Şans: Seri Uzunluğu",
+  "DICE_MASTER.settings.badLuckStreak.hint": "Art arda kaç kötü d20 sonraki d20'de korumayı tetikler.",
+  "DICE_MASTER.debug.modifier.badLuck": "kötü şans koruması ({controller}) → ikinci d20 {second}, yüksek olan tutuldu"
 }

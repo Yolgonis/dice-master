@@ -1,5 +1,5 @@
 var MODULE_ID = "dice-master";
-var MODULE_VERSION = "0.8.0";
+var MODULE_VERSION = "0.9.0";
 var SOCKET_NAME = `module.${MODULE_ID}`;
 var socketlibModule = null;
 var DIE_TYPES = [

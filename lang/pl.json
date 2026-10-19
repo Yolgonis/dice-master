@@ -57,5 +57,12 @@
   "DICE_MASTER.debug.direction.lower": "niższy",
   "DICE_MASTER.debug.modifier.nudge": "korekta {delta}",
   "DICE_MASTER.debug.modifier.threshold": "próg {threshold} → przerzucono {reroll}",
-  "DICE_MASTER.debug.modifier.thresholdSkipped": "próg {threshold} → nie zadziałał"
+  "DICE_MASTER.debug.modifier.thresholdSkipped": "próg {threshold} → nie zadziałał",
+  "DICE_MASTER.settings.badLuckEnabled.name": "Ochrona przed pechem",
+  "DICE_MASTER.settings.badLuckEnabled.hint": "Gdy gracz ze stanem Off wyrzuci kilka złych k20 z rzędu, jego następny k20 jest rzucany dwa razy i zachowywany jest wyższy wynik. Better/Worse ustawione przez MG zawsze mają pierwszeństwo.",
+  "DICE_MASTER.settings.badLuckThreshold.name": "Pech: próg złego k20",
+  "DICE_MASTER.settings.badLuckThreshold.hint": "Naturalny wynik k20 równy tej wartości lub niższy liczy się jako zły rzut.",
+  "DICE_MASTER.settings.badLuckStreak.name": "Pech: długość serii",
+  "DICE_MASTER.settings.badLuckStreak.hint": "Ile złych k20 z rzędu uruchamia ochronę przy następnym k20.",
+  "DICE_MASTER.debug.modifier.badLuck": "ochrona przed pechem ({controller}) → drugi k20 {second}, zachowano wyższy"
 }

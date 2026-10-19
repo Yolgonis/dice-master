@@ -9,16 +9,16 @@ function readJson(relativePath) {
   return JSON.parse(fs.readFileSync(path.join(root, relativePath), "utf8"));
 }
 
-test("the 0.8.0 release manifest, package, and runtime versions stay synchronized", () => {
+test("the 0.9.0 release manifest, package, and runtime versions stay synchronized", () => {
   const manifest = readJson("module.json");
   const packageJson = readJson("package.json");
   const source = fs.readFileSync(path.join(root, "dice-master.js"), "utf8");
 
   assert.equal(manifest.id, "dice-master");
   assert.equal(manifest.title, "Dice Master");
-  assert.equal(manifest.version, "0.8.0");
-  assert.equal(packageJson.version, "0.8.0");
-  assert.match(source, /var MODULE_VERSION = "0.8.0";/);
+  assert.equal(manifest.version, "0.9.0");
+  assert.equal(packageJson.version, "0.9.0");
+  assert.match(source, /var MODULE_VERSION = "0\.9\.0";/);
 });
 
 test("the distributable contains documentation, license, tests, styles, and templates", () => {

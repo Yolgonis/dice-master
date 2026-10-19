@@ -22,6 +22,10 @@ function formatModifier(info) {
 				direction: game.i18n.localize(`DICE_MASTER.debug.direction.${numericDirection}`)
 			});
 		}
+		case "badLuck": return t("DICE_MASTER.debug.modifier.badLuck", {
+			second: String(info.biasSecondRoll ?? "?"),
+			controller: String(info.controller ?? "?")
+		});
 		case "nudge": return t("DICE_MASTER.debug.modifier.nudge", { delta: formatSigned(info.nudgeDelta ?? 0) });
 		case "threshold":
 			if (!info.thresholdTriggered) return t("DICE_MASTER.debug.modifier.thresholdSkipped", { threshold: String(info.thresholdValue ?? "?") });

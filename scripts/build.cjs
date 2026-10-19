@@ -13,6 +13,7 @@ const SOURCE_FILES = Object.freeze([
   { source: "influence/strategies/nudge.js", region: "influence/strategies/nudge.ts" },
   { source: "influence/strategies/threshold.js", region: "influence/strategies/threshold.ts" },
   { source: "influence/strategies/index.js", region: "influence/strategies/index.ts" },
+  { source: "influence/bad-luck.js", region: "influence/bad-luck.ts" },
   { source: "influence/patch.js", region: "influence/patch.ts" },
   { source: "ui/widget.js", region: "ui/widget.ts" },
   { source: "integrations/dice-so-nice.js", region: "integrations/dice-so-nice.ts" },

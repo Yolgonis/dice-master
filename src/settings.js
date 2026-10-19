@@ -55,6 +55,40 @@ function registerSettings() {
 		type: Boolean,
 		default: false
 	});
+	s$2().register(MODULE_ID, "badLuckEnabled", {
+		name: "DICE_MASTER.settings.badLuckEnabled.name",
+		hint: "DICE_MASTER.settings.badLuckEnabled.hint",
+		scope: "world",
+		config: true,
+		type: Boolean,
+		default: false
+	});
+	s$2().register(MODULE_ID, "badLuckThreshold", {
+		name: "DICE_MASTER.settings.badLuckThreshold.name",
+		hint: "DICE_MASTER.settings.badLuckThreshold.hint",
+		scope: "world",
+		config: true,
+		type: Number,
+		default: 5,
+		range: {
+			min: 1,
+			max: 10,
+			step: 1
+		}
+	});
+	s$2().register(MODULE_ID, "badLuckStreak", {
+		name: "DICE_MASTER.settings.badLuckStreak.name",
+		hint: "DICE_MASTER.settings.badLuckStreak.hint",
+		scope: "world",
+		config: true,
+		type: Number,
+		default: 3,
+		range: {
+			min: 2,
+			max: 6,
+			step: 1
+		}
+	});
 	s$2().registerMenu(MODULE_ID, "diceSettingsMenu", {
 		name: "DICE_MASTER.settings.diceSettingsMenu.name",
 		label: "DICE_MASTER.settings.diceSettingsMenu.label",

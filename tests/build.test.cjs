@@ -17,6 +17,7 @@ test("the maintainable source tree contains every runtime region", () => {
     "influence/strategies/nudge.js",
     "influence/strategies/threshold.js",
     "influence/strategies/index.js",
+    "influence/bad-luck.js",
     "influence/patch.js",
     "ui/widget.js",
     "integrations/dice-so-nice.js",

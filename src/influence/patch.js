@@ -114,7 +114,30 @@ function patchRollEvaluate() {
 		const dieType = getDieType(faces);
 		if (!dieType || !isDieAffected(dieType)) return result;
 		const originalResult = result.result;
-		if (config.state === "off") return result;
+		if (config.state === "off") {
+			if (dieType !== "d20" || !isBadLuckProtectionPending(controllerUserId, config.state)) return result;
+			const badLuckDirection = resolveDirection("better", getPositiveDirection(dieType));
+			const debug = applyBias([result], { state: "better", direction: badLuckDirection, faces, biasBetterLimit: 0, biasWorseLimit: 0 });
+			this._diceMasterBadLuck = true;
+			this._diceMasterInfluenced = true;
+			this._diceMasterDirection = "better";
+			if (config.debugMode) {
+				if (!this._diceMasterDebug) this._diceMasterDebug = [];
+				this._diceMasterDebug.push({
+					dieType,
+					faces,
+					strategy: "badLuck",
+					state: "better",
+					controller: getControllerLabel(controllerUserId),
+					controllerTrace: dieControllerTraces.get(this) ?? `local-die->${controllerUserId ?? "unknown"}`,
+					direction: badLuckDirection,
+					originalResult,
+					finalResult: result.result,
+					...debug
+				});
+			}
+			return result;
+		}
 		const positiveDirection = getPositiveDirection(dieType);
 		const direction = resolveDirection(config.state, positiveDirection);
 		if (!direction) return result;
@@ -161,11 +184,12 @@ function patchRollEvaluate() {
 		if (controllerUserId) bindRollController(this, controllerUserId, source);
 		const result = await wrapped(options);
 		const config = getInfluenceConfig(controllerUserId);
+		recordBadLuckRoll(result, controllerUserId, config.state);
 		if (!config.explicitMode && !config.debugMode) return result;
 		if (!result.terms.some((term) => term._diceMasterInfluenced)) return result;
 		if (config.explicitMode) {
 			result.options.diceMasterInfluenced = true;
-			result.options.diceMasterDirection = config.state;
+			result.options.diceMasterDirection = result.terms.some((term) => term._diceMasterBadLuck) ? "better" : config.state;
 			pendingInfluencedRoll = true;
 		}
 		if (config.debugMode) {

@@ -2,6 +2,17 @@
 
 Bu projedeki önemli değişiklikler bu dosyada belgelenir.
 
+## 0.9.0 — 2026-10-19
+
+### Features
+
+- Kötü şans koruması: bir oyuncu art arda kötü d20 atarsa sonraki d20'si bir kez Bias ile (iki kez at, yüksek olanı tut) atılır. Ayarlar: açma/kapama (varsayılan kapalı), kötü d20 eşiği (varsayılan 5), seri uzunluğu (varsayılan 3). Yalnızca oyuncular için ve durum Off iken çalışır.
+- Debug dökümünde koruma ayrı satır olarak görünür (EN/TR/PL).
+
+### Testing
+
+- Koruma tetiklenmesi, seri sıfırlama, avantajlı zar ve GM/Better-Worse/kapalı ayar istisnaları için testler. Test sayısı 39.
+
 ## 0.8.0 — 2026-10-16
 
 ### Breaking

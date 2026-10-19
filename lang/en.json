@@ -57,5 +57,12 @@
   "DICE_MASTER.debug.direction.lower": "lower",
   "DICE_MASTER.debug.modifier.nudge": "nudge {delta}",
   "DICE_MASTER.debug.modifier.threshold": "threshold {threshold} → rerolled {reroll}",
-  "DICE_MASTER.debug.modifier.thresholdSkipped": "threshold {threshold} → not triggered"
+  "DICE_MASTER.debug.modifier.thresholdSkipped": "threshold {threshold} → not triggered",
+  "DICE_MASTER.settings.badLuckEnabled.name": "Bad Luck Protection",
+  "DICE_MASTER.settings.badLuckEnabled.hint": "When a player rolls several bad d20s in a row while their state is Off, their next d20 is rolled twice and the higher result is kept. GM-set Better/Worse always takes priority.",
+  "DICE_MASTER.settings.badLuckThreshold.name": "Bad Luck: Bad d20 Threshold",
+  "DICE_MASTER.settings.badLuckThreshold.hint": "A natural d20 result at or below this value counts as a bad roll.",
+  "DICE_MASTER.settings.badLuckStreak.name": "Bad Luck: Streak Length",
+  "DICE_MASTER.settings.badLuckStreak.hint": "How many bad d20s in a row trigger protection on the next d20.",
+  "DICE_MASTER.debug.modifier.badLuck": "bad luck protection ({controller}) → second d20 {second}, higher kept"
 }

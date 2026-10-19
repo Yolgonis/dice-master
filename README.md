@@ -12,6 +12,7 @@ Dice Master, Foundry Virtual Tabletop V13 için GM kontrollü zar etkisi modül�
 - Better/Worse bias taban ve tavan sınırları
 - D&D5e ve Midi-QOL zar akışlarında kullanıcı ayrımı
 - İsteğe bağlı Socketlib, Dice So Nice ve libWrapper entegrasyonu
+- Kötü şans koruması: art arda kötü d20 atan oyuncunun sonraki d20'si bir kez iki kez atılır, yüksek olan tutulur
 - GM için sürüklenebilir hızlı kontrol paneli
 - İsteğe bağlı açık bildirim ve GM debug mesajları
 
@@ -24,6 +25,15 @@ Dice Master, Foundry Virtual Tabletop V13 için GM kontrollü zar etkisi modül�
 5. Ayrıntılı zar ayarlarına paneldeki dişli düğmesinden ulaşın.
 
 `Normal`, `Hard Mode` ve `Player Advantage` presetleri oyuncu override’larını temizleyerek tutarlı bir başlangıç durumu uygular.
+
+## Kötü şans koruması
+
+Ayarlardan açılır (varsayılan kapalı). Bir oyuncu art arda **Seri Uzunluğu** kadar (varsayılan 3) kötü d20 atarsa, yani doğal sonuç **Kötü d20 Eşiği**ne (varsayılan 5) eşit ya da altındaysa, sonraki d20 zarı bir kez Bias ile atılır: ikinci bir d20 atılır ve yüksek olan tutulur. Eşiğin üstünde bir sonuç seriyi sıfırlar; avantaj/dezavantajda tutulan zar sayılır.
+
+- Yalnızca oyuncular için ve yalnızca etkin durum Off iken çalışır; GM'in verdiği Better/Worse her zaman önceliklidir.
+- GM'in attığı zarlar (oyuncu karakteri için atılsa da) seriye sayılmaz.
+- Seri, zarı atan istemcinin belleğinde tutulur; sayfa yenilenince sıfırlanır.
+- Debug modu açıksa koruma GM'e fısıldanan dökümde "kötü şans koruması" olarak görünür.
 
 ## Güvenlik modeli
 
