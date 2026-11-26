@@ -68,6 +68,14 @@ Testler kullanıcı izolasyonu, eşzamanlı workflow’lar, durum migrasyonu, d�
 
 Runtime işaretleri yalnızca `diceMaster*` adlarını kullanır. 0.8.0 ile eski `fumbleSwitch*` işaretleri ve `FumbleSwitchSettingsMenu` alias'ı kaldırıldı. Eski `cheat*` dünya ayarları ilk açılışta aktif GM tarafından `influence*` anahtarlarına taşınır.
 
+## Kurulum
+
+Foundry'de **Add-on Modules → Install Module** ekranında, alttaki **Manifest URL** alanına şunu yapıştırın:
+
+```
+https://github.com/Yolgonis/dice-master/releases/latest/download/module.json
+```
+
 ## Lisans
 
 MIT — ayrıntılar için `LICENSE` dosyasına bakın.

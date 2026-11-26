@@ -62,5 +62,9 @@
       }
     ]
   },
-  "license": "LICENSE"
+  "license": "LICENSE",
+  "url": "https://github.com/Yolgonis/dice-master",
+  "bugs": "https://github.com/Yolgonis/dice-master/issues",
+  "manifest": "https://github.com/Yolgonis/dice-master/releases/latest/download/module.json",
+  "download": "https://github.com/Yolgonis/dice-master/releases/download/v0.9.0/module.zip"
 }
